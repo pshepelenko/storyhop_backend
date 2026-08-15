@@ -1,0 +1,254 @@
+{
+  "startedAt": "2026-06-23T21:10:49.498Z",
+  "childProfile": {
+    "childName": "Mila",
+    "childAge": "7",
+    "languageLevel": "A1"
+  },
+  "seasonSetup": {
+    "theme": "friendship and courage",
+    "world": "The Floating Orchard Isles — tiny islands of fruit trees connected by rope bridges and wind kites",
+    "vocabularyFocus": [
+      "help",
+      "listen",
+      "brave",
+      "share"
+    ],
+    "preferredTone": "warm, adventurous, gently funny",
+    "comments": "Child loves dragons but keep them friendly helpers, not scary monsters."
+  },
+  "variants": [
+    {
+      "variant": {
+        "id": "flash_no_thinking",
+        "label": "DeepSeek V4 Flash, no thinking",
+        "model": "deepseek/deepseek-v4-flash",
+        "reasoning": {
+          "enabled": false
+        }
+      },
+      "steps": {
+        "framework": {
+          "latencyMs": 26077,
+          "usage": {
+            "prompt_tokens": 419,
+            "completion_tokens": 2071,
+            "total_tokens": 2490,
+            "cost": 0.000446978,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.000446978,
+              "upstream_inference_prompt_cost": 0.000041062,
+              "upstream_inference_completions_cost": 0.000405916
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "preview": "In the Floating Orchard Isles, every island's fruit tree is connected by a magical song that makes the islands float. When the song starts fading, the islands begin to sink. Mila, with her new dragon friend Ember, must gather the lost notes of the song from each island to save their home."
+        },
+        "bible": {
+          "latencyMs": 22704,
+          "usage": {
+            "prompt_tokens": 2252,
+            "completion_tokens": 2861,
+            "total_tokens": 5113,
+            "cost": 0.001068516,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.001068516,
+              "upstream_inference_prompt_cost": 0.000301768,
+              "upstream_inference_completions_cost": 0.000766748
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "preview": "The Floating Orchard Isles are a cluster of lush, fruit-covered islands that drift in a sky-sea of soft clouds. Each island is anchored by a single fruit tree that hums a unique note. Together, these notes form the Harmony Song, which keeps the islands afloat. The islands are connected by rope bridges tended by friendly bridge animals (squirrels and birds). Travel between islands is done with wind kites that respond to a friendly tune. The world is warm, colorful, and cozy, with gentle breezes and glowing fruit. When the song weakens, Grumble Vines—thorny, confused vines—appear, causing the islands to wobble and sink. The world is safe but full of small, solvable problems that teach Mila values."
+        }
+      },
+      "scores": {
+        "framework": {
+          "score": 8,
+          "max": 8,
+          "issues": []
+        },
+        "bible": {
+          "score": 5,
+          "max": 7,
+          "issues": [
+            "missing vocabularyPlan.coreWords"
+          ]
+        }
+      },
+      "totalLatencyMs": 48781,
+      "totalTokens": 7603,
+      "error": "Expected ',' or ']' after array element in JSON at position 45089 (line 783 column 6)"
+    },
+    {
+      "variant": {
+        "id": "flash_medium_thinking",
+        "label": "DeepSeek V4 Flash, thinking medium",
+        "model": "deepseek/deepseek-v4-flash",
+        "reasoning": {
+          "effort": "medium"
+        }
+      },
+      "steps": {
+        "framework": {
+          "latencyMs": 21909,
+          "usage": {
+            "prompt_tokens": 419,
+            "completion_tokens": 2401,
+            "total_tokens": 2820,
+            "cost": 0.000699614,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.000699614,
+              "upstream_inference_prompt_cost": 0.000056146,
+              "upstream_inference_completions_cost": 0.000643468
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 837,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "preview": "In the Floating Orchard Isles, where islands of fruit trees are linked by rope bridges and wind kites, a young dragon named Squiggle accidentally swallows the last Harmony Blossom—the magical fruit that keeps the islands from drifting apart. Mila must help Squiggle grow a new blossom by finding Rainbow Soil, learning that bravery comes from helping others and listening to new friends."
+        },
+        "bible": {
+          "latencyMs": 25168,
+          "usage": {
+            "prompt_tokens": 1743,
+            "completion_tokens": 2276,
+            "total_tokens": 4019,
+            "cost": 0.0008813,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0008813,
+              "upstream_inference_prompt_cost": 0.00024402,
+              "upstream_inference_completions_cost": 0.00063728
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 114,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "preview": "The Floating Orchard Isles are a cluster of sky islands, each anchored by a gently swaying rope bridge and a kite line. Every island hosts a unique fruit tree that glows with its own color and hums a soft musical note. The isles stay together thanks to the Harmony Blossom—a magical fruit whose melody keeps them from drifting apart. The world is filled with friendly helper dragons, talking kite birds, and a gentle wind spirit. The tone is warm, adventurous, and gently funny, with no scary moments."
+        }
+      },
+      "scores": {
+        "framework": {
+          "score": 8,
+          "max": 8,
+          "issues": []
+        },
+        "bible": {
+          "score": 5,
+          "max": 7,
+          "issues": [
+            "missing vocabularyPlan.coreWords"
+          ]
+        }
+      },
+      "totalLatencyMs": 47077,
+      "totalTokens": 6839,
+      "error": "Expected ',' or ']' after array element in JSON at position 39463 (line 615 column 6)"
+    },
+    {
+      "variant": {
+        "id": "pro_no_thinking",
+        "label": "DeepSeek V4 Pro, no thinking",
+        "model": "deepseek/deepseek-v4-pro",
+        "reasoning": {
+          "enabled": false
+        }
+      },
+      "steps": {
+        "framework": {
+          "latencyMs": 58568,
+          "usage": {
+            "prompt_tokens": 419,
+            "completion_tokens": 1653,
+            "total_tokens": 2072,
+            "cost": 0.0048425,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0048425,
+              "upstream_inference_prompt_cost": 0.0005447,
+              "upstream_inference_completions_cost": 0.0042978
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "preview": "When a shy Cloud-Dragon accidentally swallows the Great Sunstone that keeps the Floating Orchard Isles in the sky, Mila must help her new friend learn to control his hiccups and return the stone before the islands drift apart forever."
+        }
+      },
+      "scores": {
+        "framework": {
+          "score": 8,
+          "max": 8,
+          "issues": []
+        }
+      },
+      "totalLatencyMs": 58568,
+      "totalTokens": 2072,
+      "error": "Expected ',' or '}' after property value in JSON at position 12182 (line 191 column 4)"
+    },
+    {
+      "variant": {
+        "id": "pro_medium_thinking",
+        "label": "DeepSeek V4 Pro, thinking medium",
+        "model": "deepseek/deepseek-v4-pro",
+        "reasoning": {
+          "effort": "medium"
+        }
+      },
+      "steps": {},
+      "scores": {},
+      "totalLatencyMs": 0,
+      "totalTokens": 0,
+      "error": "Expected ',' or ']' after array element in JSON at position 6314 (line 34 column 6)"
+    }
+  ],
+  "finishedAt": "2026-06-23T21:24:01.709Z",
+  "totalBenchmarkMs": 792218
+}

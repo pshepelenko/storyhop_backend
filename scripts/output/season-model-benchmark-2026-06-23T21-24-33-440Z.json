@@ -1,0 +1,1100 @@
+{
+  "startedAt": "2026-06-23T21:24:33.441Z",
+  "childProfile": {
+    "childName": "Mila",
+    "childAge": "7",
+    "languageLevel": "A1"
+  },
+  "seasonSetup": {
+    "theme": "friendship and courage",
+    "world": "The Floating Orchard Isles — tiny islands of fruit trees connected by rope bridges and wind kites",
+    "vocabularyFocus": [
+      "help",
+      "listen",
+      "brave",
+      "share"
+    ],
+    "preferredTone": "warm, adventurous, gently funny",
+    "comments": "Child loves dragons but keep them friendly helpers, not scary monsters."
+  },
+  "variants": [
+    {
+      "variant": {
+        "id": "flash_no_thinking",
+        "label": "DeepSeek V4 Flash, no thinking",
+        "model": "deepseek/deepseek-v4-flash",
+        "reasoning": {
+          "enabled": false
+        }
+      },
+      "steps": {
+        "framework": {
+          "latencyMs": 132529,
+          "usage": {
+            "prompt_tokens": 419,
+            "completion_tokens": 1645,
+            "total_tokens": 2064,
+            "cost": 0.00036578,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 64,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.00036578,
+              "upstream_inference_prompt_cost": 0.00003678,
+              "upstream_inference_completions_cost": 0.000329
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "preview": "In the Floating Orchard Isles, young Mila discovers that the gentle dragon who helps the islands' fruit trees grow has lost her song, and without it the trees will stop blooming. Mila must journey across the isles to find the dragon's lost melody and save the harvest."
+        },
+        "bible": {
+          "latencyMs": 199514,
+          "usage": {
+            "prompt_tokens": 1845,
+            "completion_tokens": 2061,
+            "total_tokens": 3906,
+            "cost": 0.00059158,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 64,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.00059158,
+              "upstream_inference_prompt_cost": 0.00017938,
+              "upstream_inference_completions_cost": 0.0004122
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "preview": "The Floating Orchard Isles are a cluster of lush, fruit-bearing islands suspended in a soft, pastel sky. Each island is connected by sturdy rope bridges and floating wind kites that carry messages. The islands are home to friendly creatures and gentle dragons, all living in harmony. The central problem is that Zephyra, the gentle dragon, has lost her magical song, causing the fruit trees to wilt. Mila, a 7-year-old girl, embarks on a journey to find the lost melody and save the harvest."
+        },
+        "outline": {
+          "latencyMs": 101369,
+          "usage": {
+            "prompt_tokens": 3986,
+            "completion_tokens": 5322,
+            "total_tokens": 9308,
+            "cost": 0.0020482,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0020482,
+              "upstream_inference_prompt_cost": 0.00055804,
+              "upstream_inference_completions_cost": 0.00149016
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "episodeCount": 24,
+          "preview": "Episodes 1-5: Zephyra loses her song, Mila learns about the wind, finds first note. Episodes 6-11: Second note found through sharing. Episode 12-16: Third note found, midpoint reversal with wind's confession. Episodes 17-22: Fourth note found, low point, wind's sadness revealed. Episodes 23-24: New song created, wind befriended, islands bloom."
+        }
+      },
+      "scores": {
+        "framework": {
+          "score": 8,
+          "max": 8,
+          "issues": []
+        },
+        "bible": {
+          "score": 5,
+          "max": 7,
+          "issues": [
+            "missing vocabularyPlan.coreWords"
+          ]
+        },
+        "outline": {
+          "score": 8,
+          "max": 8,
+          "issues": []
+        },
+        "total": {
+          "score": 21,
+          "max": 23
+        }
+      },
+      "totalLatencyMs": 433412,
+      "totalTokens": 15278,
+      "error": null,
+      "artifacts": {
+        "framework": {
+          "seasonPremise": "In the Floating Orchard Isles, young Mila discovers that the gentle dragon who helps the islands' fruit trees grow has lost her song, and without it the trees will stop blooming. Mila must journey across the isles to find the dragon's lost melody and save the harvest.",
+          "centralProblem": "The gentle dragon Zephyra has lost her magical song, which is essential for the fruit trees to bloom and bear fruit. Without it, the islands will wither, and the creatures who depend on the fruit will have to leave.",
+          "dramaticQuestion": "Can Mila, with her small size and big heart, find the courage to listen to the whispers of the islands and help Zephyra remember her song before the last blossom falls?",
+          "externalStakes": "If the song is not found, the Floating Orchard Isles will become barren, the rope bridges will rot, and all the friendly creatures (including Zephyra) will have to move away to find food.",
+          "emotionalStakes": "Mila fears she is not brave enough to help, and Zephyra feels sad and useless without her song. Mila must learn that helping others starts with listening and sharing kindness.",
+          "heroWant": "Mila wants to find the lost song and make the islands bloom again so everyone can stay and be happy.",
+          "heroNeed": "Mila needs to learn that being brave means asking for help, listening carefully to others, and sharing her own feelings even when she is scared.",
+          "antagonisticForce": "The Whispering Wind, a mischievous but not evil breeze that stole pieces of Zephyra's song and scattered them across the isles because it felt ignored. It hides the song fragments in tricky places and plays tricks on those who don't listen carefully.",
+          "rulesOfWorld": "The islands float on soft clouds; rope bridges connect them; wind kites carry messages; fruit trees glow when happy; Zephyra is a small, fluffy dragon who breathes musical notes instead of fire; each island has a unique fruit and a friendly creature guardian.",
+          "incitingIncident": "During the Great Blossom Festival, Zephyra tries to sing the morning blessing but only a sad puff of air comes out — the trees' flowers start drooping immediately. Mila is the first to notice and runs to hug Zephyra, promising to help.",
+          "pointOfNoReturn": "Mila decides to leave her home island, Plum Peak, and cross the rickety Rainbow Bridge to the Whispering Woods — the only place where the wind's secrets are spoken — knowing she cannot come back until she finds at least one song fragment.",
+          "miniArcPlan": [
+            {
+              "arcTitle": "The Lost Note on Lullaby Island",
+              "episodes": "5-6 episodes",
+              "goal": "Find the first song fragment hidden in a giant lemon tree guarded by a shy cloud sheep who only shares if Mila listens to its worries.",
+              "vocabularyFocus": [
+                "help",
+                "listen"
+              ],
+              "outcome": "Mila learns that helping means listening first, and she earns the first note — a soft 'Do' that makes Zephyra smile."
+            },
+            {
+              "arcTitle": "The Berry Bridge of Sharing",
+              "episodes": "5-6 episodes",
+              "goal": "Cross the Berry Bridge where the second fragment is stuck in a puzzle box that only opens when three different fruit creatures share their favorite snack.",
+              "vocabularyFocus": [
+                "share",
+                "brave"
+              ],
+              "outcome": "Mila teaches the creatures to share, unlocking the second note — a bright 'Re' — and learns that sharing makes everyone stronger."
+            },
+            {
+              "arcTitle": "The Brave Kite Flight",
+              "episodes": "5-6 episodes",
+              "goal": "Ride a giant kite to the highest island where the third fragment is trapped in a cloud cage, but Mila must face her fear of heights.",
+              "vocabularyFocus": [
+                "brave",
+                "help"
+              ],
+              "outcome": "Mila asks Zephyra to fly beside her for courage, and together they free the note 'Mi', proving bravery is about asking for help."
+            },
+            {
+              "arcTitle": "The Echo Cave of Listening",
+              "episodes": "5-6 episodes",
+              "goal": "Enter a cave where the fourth fragment echoes endlessly — Mila must listen carefully to find the real note among the fake echoes.",
+              "vocabularyFocus": [
+                "listen",
+                "share"
+              ],
+              "outcome": "Mila discovers the note 'Fa' by sharing a secret with the cave's echo spirit, learning that listening deeply reveals truth."
+            }
+          ],
+          "midpointReversal": "After collecting three notes, Mila and Zephyra return to Plum Peak to celebrate, but the Whispering Wind appears and reveals that it stole the song because it felt lonely and unheard. Mila realizes the wind isn't evil — it just needs someone to listen to its story too. This changes the quest from 'defeating the wind' to 'befriending the wind.'",
+          "lowPoint": "The wind, feeling misunderstood, blows all four collected notes into a storm cloud. Zephyra is too sad to try anymore, and Mila sits alone on a wilted branch, thinking she has failed. The last blossom on her home tree falls, and she cries, believing she isn't brave enough.",
+          "finalChallenge": "Mila must fly on Zephyra's back into the heart of the storm cloud to find the Whispering Wind's hidden lair. There, she must sing a new song — not Zephyra's old one, but a song made from all the notes she found plus a new note from her own heart — to show the wind that everyone's voice matters.",
+          "resolution": "Mila sings a simple song about friendship, courage, and listening, using the four notes plus a fifth note she creates from her own brave feelings. The wind is moved and returns all the fragments, plus adds its own wind-chime harmony. Zephyra's song is reborn — even more beautiful than before — and the islands bloom brighter than ever. The wind becomes a friend who now shares its songs with everyone.",
+          "characterChange": "Mila starts as a shy girl who thinks she needs to solve everything alone. By the end, she confidently asks for help, listens to others (even the wind), shares her feelings, and knows that bravery means being vulnerable. She becomes the official 'Listener of the Isles.'",
+          "safetyBoundaries": "No real danger: heights are always cushioned by soft clouds; the wind never hurts anyone, just plays tricks; Zephyra is always nearby to catch Mila if she falls; all creatures are friendly or just shy; storms are gentle and sparkly; no permanent loss — wilted trees recover quickly after the song returns.",
+          "toneGuide": "Warm and cozy with gentle humor: the wind might tickle Mila's nose at funny moments; Zephyra sometimes sneezes musical bubbles; fruit creatures have silly names like 'Grumpy Grape' or 'Giggling Guava'; moments of sadness are brief and immediately followed by comfort from a friend. Always end each episode with a feeling of hope or a small win.",
+          "recurringMotifs": "Fruit (apples, plums, berries, lemons) as symbols of growth and sharing; wind kites as messages of hope; rope bridges as connections between friends; musical notes floating like fireflies; the color gold for bravery; the act of hugging as a way to share feelings; the phrase 'I hear you' used often by Mila."
+        },
+        "bible": {
+          "worldOverview": "The Floating Orchard Isles are a cluster of lush, fruit-bearing islands suspended in a soft, pastel sky. Each island is connected by sturdy rope bridges and floating wind kites that carry messages. The islands are home to friendly creatures and gentle dragons, all living in harmony. The central problem is that Zephyra, the gentle dragon, has lost her magical song, causing the fruit trees to wilt. Mila, a 7-year-old girl, embarks on a journey to find the lost melody and save the harvest.",
+          "worldRules": [
+            "The islands float on soft, cushiony clouds that support all life and prevent any real danger from heights.",
+            "Rope bridges connect the islands, but some are rickety and require careful crossing.",
+            "Wind kites are used to send messages and transport small items across the isles.",
+            "Fruit trees glow with a warm light when they are happy and healthy.",
+            "Zephyra is a small, fluffy dragon who breathes musical notes instead of fire.",
+            "Each island has a unique fruit and a friendly creature guardian that protects it.",
+            "The Whispering Wind is a mischievous but not evil entity that plays tricks and hides song fragments.",
+            "All creatures are friendly or shy; there are no scary monsters or real threats.",
+            "Storms are gentle and sparkly, never dangerous.",
+            "Wilted trees recover quickly once the song is restored."
+          ],
+          "mainLocations": [
+            {
+              "name": "Plum Peak",
+              "description": "Mila's home island, covered in plum trees. It has a cozy cottage and a central festival ground where the Great Blossom Festival is held.",
+              "features": "Plum trees, Mila's cottage, rope bridge to Rainbow Bridge, wind kite post."
+            },
+            {
+              "name": "Lullaby Island",
+              "description": "A small island with a giant lemon tree. Home to a shy cloud sheep who guards the first song fragment.",
+              "features": "Giant lemon tree, soft cloud fields, a hidden note in the tree's trunk."
+            },
+            {
+              "name": "Berry Bridge",
+              "description": "A long, winding bridge made of berry vines connecting two islands. It has a puzzle box that requires sharing to open.",
+              "features": "Berry vines, puzzle box, three fruit creature guardians (e.g., Grumpy Grape, Giggling Guava, Sweet Strawberry)."
+            },
+            {
+              "name": "Skyward Kite Island",
+              "description": "The highest island, accessible only by a giant kite. It has a cloud cage containing the third song fragment.",
+              "features": "Giant kite launch pad, cloud cage, fluffy cloud platforms."
+            },
+            {
+              "name": "Echo Cave Island",
+              "description": "An island with a cave that echoes sounds. The fourth fragment is hidden inside, guarded by an echo spirit.",
+              "features": "Echo cave, glowing crystals, a secret chamber with the real note."
+            },
+            {
+              "name": "Whispering Woods",
+              "description": "A mysterious forest on a floating island where the wind's secrets are spoken. It is the point of no return and the wind's lair.",
+              "features": "Whispering trees, wind chimes, storm cloud lair of the Whispering Wind."
+            }
+          ],
+          "mainCharacters": [
+            {
+              "name": "Mila",
+              "age": 7,
+              "role": "Hero",
+              "description": "A shy but kind-hearted girl with a big imagination. She loves helping others and learns to be brave by asking for help.",
+              "personality": "Curious, gentle, initially shy, grows confident.",
+              "abilities": "Good listener, brave heart, learns to sing a new song."
+            },
+            {
+              "name": "Zephyra",
+              "age": "Young dragon (equivalent to 10 human years)",
+              "role": "Friend and helper",
+              "description": "A small, fluffy dragon with soft blue scales and golden eyes. She breathes musical notes and loves to sing.",
+              "personality": "Gentle, sad at first, loyal, playful when happy.",
+              "abilities": "Flying, breathing musical notes, carrying Mila safely."
+            },
+            {
+              "name": "Whispering Wind",
+              "age": "Ancient spirit",
+              "role": "Antagonistic force (mischievous, not evil)",
+              "description": "A playful breeze that feels ignored and steals song fragments to get attention. It hides in storm clouds and plays tricks.",
+              "personality": "Mischievous, lonely, eventually becomes a friend.",
+              "abilities": "Blowing objects, hiding notes, creating gentle storms."
+            },
+            {
+              "name": "Shy Cloud Sheep",
+              "age": "Unknown",
+              "role": "Guardian of Lullaby Island",
+              "description": "A fluffy sheep made of clouds who is very shy and only shares if someone listens to its worries.",
+              "personality": "Shy, gentle, kind.",
+              "abilities": "Can change shape, can whisper secrets."
+            },
+            {
+              "name": "Grumpy Grape",
+              "age": "Unknown",
+              "role": "Guardian of Berry Bridge puzzle",
+              "description": "A small, purple grape creature who is grumpy but loves sharing snacks.",
+              "personality": "Grumpy on the outside, soft inside.",
+              "abilities": "Holds one piece of the puzzle key."
+            },
+            {
+              "name": "Giggling Guava",
+              "age": "Unknown",
+              "role": "Guardian of Berry Bridge puzzle",
+              "description": "A green guava creature who giggles constantly and loves to share jokes.",
+              "personality": "Happy, silly, friendly.",
+              "abilities": "Holds another puzzle key piece."
+            },
+            {
+              "name": "Echo Spirit",
+              "age": "Ancient",
+              "role": "Guardian of Echo Cave",
+              "description": "A shimmering, translucent spirit that lives in the cave and loves secrets.",
+              "personality": "Playful, mysterious, wise.",
+              "abilities": "Creates echoes, reveals truth when a secret is shared."
+            }
+          ],
+          "seasonContinuityRules": [
+            "Each mini-arc introduces one new vocabulary word and reinforces previous ones.",
+            "Song fragments are collected in order (Do, Re, Mi, Fa) and each is tied to a lesson.",
+            "Zephyra's sadness decreases as more fragments are found, but she has moments of doubt.",
+            "The Whispering Wind appears periodically, becoming more sympathetic after the midpoint.",
+            "All episodes end with a small win or hopeful moment to maintain a warm tone.",
+            "Recurring motifs (fruit, kites, bridges, musical notes, hugs, 'I hear you') appear in every arc.",
+            "Safety boundaries are always maintained: no real danger, soft clouds, friendly creatures."
+          ],
+          "vocabularyPlan": {
+            "focusWords": [
+              "help",
+              "listen",
+              "brave",
+              "share"
+            ],
+            "introductionOrder": [
+              {
+                "arc": "The Lost Note on Lullaby Island",
+                "newWords": [
+                  "help",
+                  "listen"
+                ]
+              },
+              {
+                "arc": "The Berry Bridge of Sharing",
+                "newWords": [
+                  "share",
+                  "brave"
+                ]
+              },
+              {
+                "arc": "The Brave Kite Flight",
+                "newWords": [
+                  "brave",
+                  "help"
+                ]
+              },
+              {
+                "arc": "The Echo Cave of Listening",
+                "newWords": [
+                  "listen",
+                  "share"
+                ]
+              }
+            ],
+            "reinforcement": "Each arc reuses previous vocabulary in dialogue and activities. For example, after arc 1, 'help' and 'listen' appear in all subsequent arcs."
+          },
+          "rewardLogic": {
+            "inEpisodeRewards": "A small, tangible collectible for each episode (e.g., a sticker of a fruit, a wind kite charm, a musical note badge). These are earned by completing a simple task (e.g., saying 'help' in a sentence, listening to a creature's story).",
+            "arcCompletionReward": "A larger digital reward (e.g., a new kite design, a special Zephyra animation, a song snippet) for finishing all episodes in an arc.",
+            "seasonCompletionReward": "A full interactive song that Mila sings, which the child can play and sing along to, plus a certificate of 'Listener of the Isles'."
+          },
+          "illustrationStyleGuide": {
+            "generalStyle": "Warm, soft, and colorful with a storybook feel. Use pastel backgrounds and gentle line art.",
+            "colorPalette": "Sky blue, soft pink, lemon yellow, berry purple, mint green, and gold accents.",
+            "characterDesign": "Mila has big, expressive eyes and a warm smile; she wears a simple dress and a wind kite badge. Zephyra is small and fluffy with rounded features; her scales are light blue with gold sparkles. Creatures are cute and friendly with exaggerated expressions.",
+            "environmentDesign": "Islands are rounded with fluffy cloud edges. Trees have glowing fruit. Bridges are made of thick, colorful ropes. Wind kites are shaped like leaves or flowers.",
+            "specialEffects": "Musical notes float like fireflies in soft gold and pink. The wind is shown as swirling, sparkly trails. Storm clouds are fluffy and silver with gentle lightning.",
+            "toneConsistency": "Always keep scenes bright and hopeful, even in sad moments. Use soft shadows and warm lighting to maintain a cozy atmosphere."
+          }
+        },
+        "outline": {
+          "episodeCount": 24,
+          "continuityCheck": {
+            "centralProblemProgression": "Episodes 1-5: Zephyra loses her song, Mila learns about the wind, finds first note. Episodes 6-11: Second note found through sharing. Episode 12-16: Third note found, midpoint reversal with wind's confession. Episodes 17-22: Fourth note found, low point, wind's sadness revealed. Episodes 23-24: New song created, wind befriended, islands bloom.",
+            "midpointEpisode": 12,
+            "lowPointEpisode": 20,
+            "finaleEpisodes": [
+              23,
+              24
+            ]
+          },
+          "firstEpisodes": [
+            {
+              "episodeNumber": 1,
+              "miniArcNumber": 1,
+              "title": "The Great Blossom Festival",
+              "storyPurpose": "Introduce Mila, Zephyra, and the Floating Orchard Isles. Establish the inciting incident: Zephyra loses her song during the festival.",
+              "conflict": "Zephyra tries to sing the morning blessing but only produces a sad puff of air. The plum tree blossoms begin to droop.",
+              "vocabularyFocus": [
+                "help"
+              ],
+              "expectedChoiceTheme": "Mila must choose to either stay with the festival or run to comfort Zephyra. (Choosing to comfort Zephyra advances the story.)",
+              "stateChangeGoal": "Mila decides to help Zephyra find her lost song.",
+              "illustrationOpportunity": "A vibrant festival scene with glowing plum trees, colorful banners, and a sad Zephyra surrounded by drooping flowers.",
+              "cliffhangerOrHook": "Mila hugs Zephyra and whispers, 'I'll help you find your song!' as the first blossom falls."
+            },
+            {
+              "episodeNumber": 2,
+              "miniArcNumber": 1,
+              "title": "The Whispering Wind's Whistle",
+              "storyPurpose": "Introduce the Whispering Wind as the antagonistic force. Mila learns the wind stole Zephyra's song.",
+              "conflict": "A mischievous breeze blows Mila's hat away and whispers hints about the lost song. Mila must decide whether to chase the wind or stay with Zephyra.",
+              "vocabularyFocus": [
+                "help",
+                "listen"
+              ],
+              "expectedChoiceTheme": "Mila can either chase the wind alone or ask Zephyra to come with her. (Asking for help is the better choice.)",
+              "stateChangeGoal": "Mila learns that the wind scattered song fragments across the isles.",
+              "illustrationOpportunity": "Mila chasing a sparkling wind trail while Zephyra watches sadly from a distance.",
+              "cliffhangerOrHook": "The wind leaves a glowing map showing Lullaby Island as the first destination."
+            },
+            {
+              "episodeNumber": 3,
+              "miniArcNumber": 1,
+              "title": "Crossing the Rainbow Bridge",
+              "storyPurpose": "Mila leaves her home island, crossing the point of no return. Introduce the first journey and the concept of rope bridges.",
+              "conflict": "The Rainbow Bridge is rickety and Mila is scared. Zephyra offers to fly alongside her for encouragement.",
+              "vocabularyFocus": [
+                "help"
+              ],
+              "expectedChoiceTheme": "Mila can cross the bridge alone or ask Zephyra to fly beside her. (Choosing to ask for help builds courage.)",
+              "stateChangeGoal": "Mila successfully crosses the bridge and arrives at Lullaby Island.",
+              "illustrationOpportunity": "A colorful rope bridge stretching across a soft cloud sky, with Mila nervously stepping and Zephyra hovering nearby.",
+              "cliffhangerOrHook": "Mila sees a giant lemon tree glowing in the distance."
+            }
+          ],
+          "lastEpisodes": [
+            {
+              "episodeNumber": 23,
+              "miniArcNumber": 4,
+              "title": "The New Song",
+              "storyPurpose": "Finale part 1: Mila creates a new song from the four notes and her own brave heart.",
+              "conflict": "Mila must find a fifth note from inside herself. She is scared she can't sing.",
+              "vocabularyFocus": [
+                "brave",
+                "help"
+              ],
+              "expectedChoiceTheme": "Mila can try to sing alone or ask Zephyra to hum along. (Asking for help creates harmony.)",
+              "stateChangeGoal": "Mila sings a simple, heartfelt song, and a fifth note appears from her courage.",
+              "illustrationOpportunity": "Mila singing with her eyes closed, five golden notes floating around her, Zephyra and the wind watching.",
+              "cliffhangerOrHook": "The wind joins in with a wind-chime harmony, and the song fills the sky."
+            },
+            {
+              "episodeNumber": 24,
+              "miniArcNumber": 4,
+              "title": "The Blooming Isles",
+              "storyPurpose": "Finale part 2: Resolution. The song is reborn, the islands bloom, and the wind becomes a friend.",
+              "conflict": "The song must reach every island. Mila and Zephyra fly across the isles, spreading the melody.",
+              "vocabularyFocus": [
+                "help",
+                "listen",
+                "brave",
+                "share"
+              ],
+              "expectedChoiceTheme": "Mila can sing the song alone or invite the wind to help spread it. (Sharing the song makes it stronger.)",
+              "stateChangeGoal": "All islands bloom brighter than ever. The wind becomes a friend. Mila is named 'Listener of the Isles.'",
+              "illustrationOpportunity": "A panoramic view of all the floating islands glowing with fruit and flowers, Mila and Zephyra flying with the wind, musical notes everywhere.",
+              "cliffhangerOrHook": "Mila whispers to the wind, 'I'll always listen to you.' The wind giggles and blows a gentle, musical breeze."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "variant": {
+        "id": "flash_medium_thinking",
+        "label": "DeepSeek V4 Flash, thinking medium",
+        "model": "deepseek/deepseek-v4-flash",
+        "reasoning": {
+          "effort": "medium"
+        }
+      },
+      "steps": {
+        "framework": {
+          "latencyMs": 37068,
+          "usage": {
+            "prompt_tokens": 419,
+            "completion_tokens": 2584,
+            "total_tokens": 3003,
+            "cost": 0.000743071,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.000743071,
+              "upstream_inference_prompt_cost": 0.000055727,
+              "upstream_inference_completions_cost": 0.000687344
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1083,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "preview": "On the Floating Orchard Isles, the islands are held together by the Harmony Wind, powered by the songs of the Fruit Dragons. When the youngest dragon, Pippin, loses his song out of fear, the islands begin to drift apart. Mila must help Pippin find his courage, befriend a mysterious Cloud Whale, and restore the harmony before the islands scatter forever."
+        },
+        "bible": {
+          "latencyMs": 28043,
+          "usage": {
+            "prompt_tokens": 1695,
+            "completion_tokens": 3093,
+            "total_tokens": 4788,
+            "cost": 0.0008913948,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 1536,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0008913948,
+              "upstream_inference_prompt_cost": 0.0000624708,
+              "upstream_inference_completions_cost": 0.000828924
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 281,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "preview": "The Floating Orchard Isles are a cluster of lush islands suspended in a soft, colorful sky, held together by the magical Harmony Wind. Each island hosts a single type of fruit tree, and the entire ecosystem depends on the songs of friendly Fruit Dragons to ripen the fruit and power the wind. The sky is filled with fluffy, rideable clouds, and rope bridges connect the islands. The world is warm, safe, and full of gentle magic, where even mishaps lead to fun and learning."
+        },
+        "outline": {
+          "latencyMs": 90958,
+          "usage": {
+            "prompt_tokens": 4713,
+            "completion_tokens": 9449,
+            "total_tokens": 14162,
+            "cost": 0.0021468623,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 2215,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0021468623,
+              "upstream_inference_prompt_cost": 0.0002891889,
+              "upstream_inference_completions_cost": 0.0018576734
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 4775,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "episodeCount": 24,
+          "preview": "The Harmony Wind weakens progressively from episode 1 as Pippin loses his song. Mila and Pippin travel across the isles, meeting characters that teach sharing and bravery. At the midpoint (ep 11), they meet the Cloud Whale and realize it is not a threat. The low point occurs in episode 14 when they are stranded and the islands seem lost. In episodes 16-19, they build courage together, and in episode 20, Pippin's song with the whale's hum restores the wind, stronger than before. Episodes 23-24 show the resolution and celebration."
+        }
+      },
+      "scores": {
+        "framework": {
+          "score": 8,
+          "max": 8,
+          "issues": []
+        },
+        "bible": {
+          "score": 5,
+          "max": 7,
+          "issues": [
+            "missing vocabularyPlan.coreWords"
+          ]
+        },
+        "outline": {
+          "score": 8,
+          "max": 8,
+          "issues": []
+        },
+        "total": {
+          "score": 21,
+          "max": 23
+        }
+      },
+      "totalLatencyMs": 156069,
+      "totalTokens": 21953,
+      "error": null,
+      "artifacts": {
+        "framework": {
+          "seasonPremise": "On the Floating Orchard Isles, the islands are held together by the Harmony Wind, powered by the songs of the Fruit Dragons. When the youngest dragon, Pippin, loses his song out of fear, the islands begin to drift apart. Mila must help Pippin find his courage, befriend a mysterious Cloud Whale, and restore the harmony before the islands scatter forever.",
+          "centralProblem": "The Harmony Wind is weakening because Pippin the Fruit Dragon has lost his song. Without it, the rope bridges snap and the islands float away from each other. Mila must help Pippin overcome his fear of the shadowy Cloud Whale and rediscover his song.",
+          "dramaticQuestion": "Can Mila help Pippin be brave enough to sing again, and in doing so, save the Floating Orchard Isles from drifting apart?",
+          "externalStakes": "If the Harmony Wind stops completely, the islands will separate forever, cutting off the fruit trees from their magical pollination and stranding the creatures who live there.",
+          "emotionalStakes": "Mila wants to prove she can be a good friend and helper. Pippin wants to feel brave and not let everyone down. The Cloud Whale wants to be accepted and find its way home.",
+          "heroWant": "Mila wants to help Pippin find his song and fix the bridges so the islands stay together.",
+          "heroNeed": "Mila needs to learn that true help comes from listening and being patient, not just fixing things quickly. She also needs to be brave enough to try new things herself.",
+          "antagonisticForce": "Pippin’s own fear (not a villain). The fear is embodied by the mysterious shadow of the Cloud Whale, which seems scary but is actually lonely. The real obstacle is misunderstanding and lack of courage.",
+          "rulesOfWorld": "Each island has one type of fruit tree (apple, pear, plum, etc.). Fruit Dragons are small, colorful, and sing to make fruit ripen. The Harmony Wind flows through the songs and keeps the islands connected. Rope bridges sway with the wind; wind kites carry messages. The sky is filled with soft clouds that can be ridden like pillows. Creatures are friendly but sometimes shy or grumpy.",
+          "incitingIncident": "Mila is on Apple Isle when the rope bridge to Pear Isle suddenly goes slack and a kite carrying a message falls at her feet. She finds Pippin the Fruit Dragon crying under a tree, unable to sing even one note. His song is gone, and without it the islands are already starting to drift.",
+          "pointOfNoReturn": "Mila and Pippin cross the broken bridge to the highest island (Shadow Isle) to find the source of his fear. The bridge collapses behind them, leaving them no quick way back.",
+          "miniArcPlan": [
+            {
+              "arcName": "The Lost Song",
+              "episodes": "1-7",
+              "summary": "Mila meets Pippin, learns about the Harmony Wind, and tries to help him sing again through playful exercises. They discover the shadow on the highest island is the cause of Pippin’s fear. Mila decides they must go there.",
+              "vocabularyFocus": [
+                "help",
+                "listen"
+              ]
+            },
+            {
+              "arcName": "Journey Across the Isles",
+              "episodes": "8-15",
+              "summary": "Traveling from island to island, Mila and Pippin meet a greedy Squirrel who hoards fruit (teaches sharing) and a shy Wind Kite that needs encouragement (teaches brave). They gather clues about the Cloud Whale.",
+              "vocabularyFocus": [
+                "share",
+                "brave"
+              ]
+            },
+            {
+              "arcName": "The Cloud Whale's Secret",
+              "episodes": "16-22",
+              "summary": "They reach Shadow Isle and meet the Cloud Whale, who is lost and lonely. Mila uses listening and sharing to befriend it. Pippin still can’t sing because he’s scared. The whale cries, causing rain that makes the bridges slippery.",
+              "vocabularyFocus": [
+                "listen",
+                "share"
+              ]
+            }
+          ],
+          "midpointReversal": "At the midpoint (episode 11-12), Mila and Pippin finally meet the Cloud Whale. Mila realizes the whale is not scary—it’s just lost. She bravely sings a simple song herself to comfort both the whale and Pippin, but her song isn’t enough to restart the Harmony Wind. This moment shows that courage can come from unexpected places, but the real solution still needs Pippin’s dragon song.",
+          "lowPoint": "After Mila’s attempt, the islands continue to drift. Pippin feels hopeless and blames himself. They become stranded on a tiny, crumbling island that is breaking apart. The rope bridge to the next island is gone, and the Harmony Wind is almost silent.",
+          "finalChallenge": "With the islands about to separate completely, Pippin must overcome his fear and sing. The Cloud Whale hums a gentle melody to help. Mila encourages Pippin to listen to the whale’s hum and join in. Together, they create a new, even stronger harmony song that combines Pippin’s dragon voice with the whale’s deep hum.",
+          "resolution": "The Harmony Wind roars back to life, pulling the islands back together. The rope bridges re-knot themselves, and the fruit trees glow with new fruit. The Cloud Whale becomes a permanent friend and helper, using its hum to strengthen the wind. Pippin learns that being brave means trusting new friends, and Mila learns that listening and sharing are the most powerful ways to help.",
+          "characterChange": "Mila starts as eager to fix things quickly but learns to be patient and listen. She becomes more confident in her own bravery. Pippin starts as fearful and insecure but learns to face his fears with support. He discovers that his song is even more beautiful when shared.",
+          "safetyBoundaries": "No real danger. Rope bridges are bouncy and safe (with handrails made of vines). Cloud Whale is soft and cuddly. Fruit Dragons are small (size of a cat) and breathe colorful sparkles, not fire. Falls are onto fluffy clouds. All creatures are friendly once understood.",
+          "toneGuide": "Warm, adventurous, gently funny. Use gentle humor: Pippin sneezes and a plum pops out. The Cloud Whale’s tears are fizzy lemonade. Mila trips over a kite string and lands in a pile of peaches. Dialogue is simple and encouraging. Emotional moments are sincere but not heavy.",
+          "recurringMotifs": [
+            "Glowing fruit that pulses with light when a dragon sings nearby",
+            "Wind kites with handwritten messages that float between islands",
+            "Rope bridges that sway and creak like a lullaby",
+            "Dragon songs that create sparkles and tiny rainbows",
+            "Cloud pillows that can be squished and ridden"
+          ]
+        },
+        "bible": {
+          "worldOverview": "The Floating Orchard Isles are a cluster of lush islands suspended in a soft, colorful sky, held together by the magical Harmony Wind. Each island hosts a single type of fruit tree, and the entire ecosystem depends on the songs of friendly Fruit Dragons to ripen the fruit and power the wind. The sky is filled with fluffy, rideable clouds, and rope bridges connect the islands. The world is warm, safe, and full of gentle magic, where even mishaps lead to fun and learning.",
+          "worldRules": [
+            "Each island grows one fruit type (e.g., apple, pear, plum, cherry).",
+            "Fruit Dragons are small (cat-sized), colorful, and sing to make fruit glow and ripen.",
+            "The Harmony Wind flows through dragon songs and keeps islands connected; without song, bridges slacken and islands drift apart.",
+            "Rope bridges have vine handrails and sway gently; they are safe and bouncy.",
+            "Wind kites carry messages between islands; they are colorful and float slowly.",
+            "Clouds are soft and rideable like pillows; falling onto them is harmless.",
+            "Creatures are friendly but may be shy or grumpy initially; no real danger.",
+            "Dragon songs create sparkles and tiny rainbows. Cloud Whale tears are fizzy lemonade.",
+            "Falls always land on fluffy clouds; no injury occurs."
+          ],
+          "mainLocations": [
+            {
+              "name": "Apple Isle",
+              "description": "Mila's starting island, covered in apple trees. The central tree has a swing made of vines. The rope bridge to Pear Isle starts here.",
+              "connection": "Connected to Pear Isle via a rope bridge."
+            },
+            {
+              "name": "Pear Isle",
+              "description": "A gentle, sloping island with pear trees. The wind kite post is here, where messages arrive and leave.",
+              "connection": "Connected to Apple Isle and Plum Isle."
+            },
+            {
+              "name": "Plum Isle",
+              "description": "Smaller, with purple plum trees and a greedy Squirrel who hoards fruit. A hidden path leads to the central clearing.",
+              "connection": "Connected to Pear Isle and Cherry Isle."
+            },
+            {
+              "name": "Cherry Isle",
+              "description": "Bright red cherry trees and a shy Wind Kite that needs encouragement to fly. The island has a high hill with a view of Shadow Isle.",
+              "connection": "Connected to Plum Isle and Shadow Isle via a long, bouncy bridge."
+            },
+            {
+              "name": "Shadow Isle",
+              "description": "The highest island, always partly cloudy. It has a single, large, soft cloud formation where the Cloud Whale lives. The bridge here is the point of no return.",
+              "connection": "Connected to Cherry Isle only; bridge collapses behind Mila and Pippin."
+            }
+          ],
+          "mainCharacters": [
+            {
+              "name": "Mila",
+              "age": 7,
+              "role": "Hero",
+              "description": "Curious, kind, and eager to help. She is learning to be patient and listen. She wears a bright yellow raincoat and carries a small satchel for collecting fruit and messages.",
+              "languageLevel": "A1",
+              "vocabularyFocus": [
+                "help",
+                "listen",
+                "brave",
+                "share"
+              ],
+              "traits": [
+                "helpful",
+                "brave when needed",
+                "sometimes impatient"
+              ]
+            },
+            {
+              "name": "Pippin",
+              "age": 2,
+              "role": "Hero / Fruit Dragon",
+              "description": "A small, golden-orange Fruit Dragon with lime-green spots. He is shy and fearful, but has a beautiful song inside him. He sneezes sometimes, causing a plum to pop out.",
+              "vocabularyFocus": [
+                "brave",
+                "share"
+              ],
+              "traits": [
+                "fearful",
+                "kind",
+                "loyal",
+                "loves sparkles"
+              ]
+            },
+            {
+              "name": "Cloud Whale",
+              "age": "Ancient",
+              "role": "Ally / Source of fear then friend",
+              "description": "A huge, soft, white-and-blue whale made of clouds and mist. It is gentle, lonely, and lost. Its hum is deep and calming. Tears are fizzy lemonade.",
+              "vocabularyFocus": [
+                "listen",
+                "share"
+              ],
+              "traits": [
+                "lonely",
+                "gentle",
+                "musical"
+              ]
+            },
+            {
+              "name": "Squee the Squirrel",
+              "age": "5",
+              "role": "Supporting character (grumpy then friend)",
+              "description": "A plump, fluffy squirrel who hoards fruit. He learns to share after Mila and Pippin help him. He stores fruit in his hollow tree.",
+              "vocabularyFocus": [
+                "share"
+              ],
+              "traits": [
+                "greedy initially",
+                "learns to share",
+                "squeaky voice"
+              ]
+            },
+            {
+              "name": "Whisk the Wind Kite",
+              "age": "1",
+              "role": "Supporting character (shy then brave)",
+              "description": "A small, sky-blue wind kite with a smiley face and ribbon tail. It is shy about flying high but learns to be brave. It carries messages.",
+              "vocabularyFocus": [
+                "brave"
+              ],
+              "traits": [
+                "shy",
+                "loves encouragement",
+                "flutters happily"
+              ]
+            }
+          ],
+          "seasonContinuityRules": [
+            "Each episode should start with a brief recap (one line) of the previous story.",
+            "Maintain a consistent warm and gently funny tone across all episodes.",
+            "No real danger; all falls land on clouds, bridges have handrails.",
+            "Pippin's fear of the Cloud Whale resolves by episode 22; the whale becomes a friend.",
+            "The Harmony Wind weakens progressively from episode 1 until the final challenge, when it is restored stronger than before.",
+            "Recurring motifs (glowing fruit, wind kites, rope bridges, dragon sparkles, cloud pillows) must appear in every episode to reinforce world consistency.",
+            "New vocabulary words (help, listen, brave, share) should be introduced gradually and repeated in context across episodes.",
+            "Each mini-arc focuses on one vocabulary word pair: Lost Song (help, listen), Journey (share, brave), Whale's Secret (listen, share).",
+            "Character growth must be shown cumulatively: Mila becomes more patient, Pippin braver, and the Cloud Whale more trusting.",
+            "Episode structure: problem introduction, gentle conflict, friendly resolution, and a closing moral or question to reinforce learning."
+          ],
+          "vocabularyPlan": {
+            "totalUniqueWords": 100,
+            "coreVocabulary": [
+              "help",
+              "listen",
+              "brave",
+              "share",
+              "sing",
+              "soft",
+              "cloud",
+              "fruit",
+              "bridge",
+              "wind"
+            ],
+            "arcDistribution": [
+              {
+                "arcName": "The Lost Song",
+                "episodes": "1-7",
+                "newWords": [
+                  "help",
+                  "listen",
+                  "fruit",
+                  "sing",
+                  "wind",
+                  "soft",
+                  "cloud",
+                  "bridge",
+                  "tree",
+                  "fall"
+                ],
+                "repetitionWords": [
+                  "help",
+                  "listen",
+                  "sing",
+                  "cloud"
+                ],
+                "phrases": [
+                  "Help me!",
+                  "Listen to this!",
+                  "Can you help?"
+                ]
+              },
+              {
+                "arcName": "Journey Across the Isles",
+                "episodes": "8-15",
+                "newWords": [
+                  "share",
+                  "brave",
+                  "squirrel",
+                  "kite",
+                  "message",
+                  "island",
+                  "rope",
+                  "high",
+                  "fly",
+                  "purple"
+                ],
+                "repetitionWords": [
+                  "help",
+                  "listen",
+                  "share",
+                  "brave"
+                ],
+                "phrases": [
+                  "Let's share.",
+                  "Be brave!",
+                  "I can help."
+                ]
+              },
+              {
+                "arcName": "The Cloud Whale's Secret",
+                "episodes": "16-22",
+                "newWords": [
+                  "whale",
+                  "shadow",
+                  "lonely",
+                  "home",
+                  "tear",
+                  "hug",
+                  "warm",
+                  "friendly",
+                  "song",
+                  "together"
+                ],
+                "repetitionWords": [
+                  "listen",
+                  "share",
+                  "brave",
+                  "help"
+                ],
+                "phrases": [
+                  "Listen to the whale.",
+                  "Sharing is fun.",
+                  "We are brave together."
+                ]
+              }
+            ],
+            "reviewEpisodes": {
+              "episode8": "Review all core vocabulary from arc 1.",
+              "episode15": "Review all core vocabulary from arcs 1 and 2.",
+              "episode22": "Review all core vocabulary from entire season."
+            }
+          },
+          "rewardLogic": {
+            "inStoryRewards": [
+              {
+                "action": "When Mila says 'help' or 'listen' correctly, a wind kite brings a message or a glowing fruit appears.",
+                "reinforcement": "Positive verbal feedback from characters (e.g., 'Good job! You helped!' or 'You listened!' )."
+              },
+              {
+                "action": "When Pippin tries to sing (even softly), sparkles and a tiny rainbow appear.",
+                "reinforcement": "Mila claps or says 'Brave!' or 'Beautiful!'."
+              },
+              {
+                "action": "When Mila helps Squee share fruit, the fruit glows brighter and a new cloud pillow forms.",
+                "reinforcement": "Squeaky laugh from Squee and a thank-you."
+              },
+              {
+                "action": "When the Cloud Whale hums along, a gentle breeze with lemonade scent appears.",
+                "reinforcement": "Mila and Pippin hug the whale."
+              }
+            ],
+            "episodeEndRewards": [
+              {
+                "type": "Collectible",
+                "item": "A colored fruit sticker for each new vocabulary word learned (e.g., red apple for 'help', yellow pear for 'listen', purple plum for 'share', green cherry for 'brave').",
+                "accumulation": "At the end of each arc, fruit stickers are placed on a Sky Map to show which islands have been helped."
+              },
+              {
+                "type": "Verbal praise",
+                "message": "Well done, Mila! You helped Pippin be brave!",
+                "frequency": "End of every episode."
+              },
+              {
+                "type": "Song completion",
+                "message": "When final song is sung, all collected fruit stickers glow and produce a digital celebration.",
+                "reinforcement": "Celebration animation with sparkles and all characters waving."
+              }
+            ]
+          },
+          "illustrationStyleGuide": {
+            "overallStyle": "Warm digital illustration with soft gradients, rounded shapes, and gentle, pastel-based colors. No harsh lines or dark shadows. Characters have expressive, simple faces (large eyes, friendly smiles).",
+            "colorPalette": {
+              "skies": "Pale blue, soft peach, lavender clouds",
+              "islands": "Warm greens, soft browns, earthy tones",
+              "fruit": "Bright but not neon: red apples, golden pears, purple plums, red cherries",
+              "dragons": "Golden-orange with lime spots (Pippin), plus other pastel hues for other dragons (pink, mint, sky blue)",
+              "cloudWhale": "Soft white and pale blue with wispy edges",
+              "bridges": "Brown/golden ropes with green vine handrails",
+              "kites": "Sky blue with white ribbons"
+            },
+            "characterDesign": {
+              "Mila": "7-year-old, pigtails, yellow raincoat, small satchel, rosy cheeks, sturdy shoes.",
+              "Pippin": "Small dragon, cat-sized, soft golden-orange body with lime-green spots, wide eyes, long tail, tiny wings that flutter when excited or scared.",
+              "Cloud Whale": "Large gentle whale shape, cloudy texture, blue and white, huge kind eyes, flippers made of cloud puffs, tail that leaves a trail of mist.",
+              "Squee": "Plump fluffy squirrel, brown with a white belly, round cheeks, tiny paws holding fruit.",
+              "Whisk": "Small kite with a happy face, sky blue, ribbon tail, string trailing, flutters in the breeze."
+            },
+            "backgrounds": "Soft, dreamy island landscapes with fruit trees, gentle rolling hills, and fluffy cloud layers in the distance. Rope bridges curve gracefully. Wind kites float in various places.",
+            "specialEffects": [
+              "Dragon songs: tiny multicolored sparkles and small rainbows",
+              "Fruit glowing: soft pulsing light from within the fruit",
+              "Wind: visible soft swirling lines, like gentle breeze",
+              "Cloud Whale tears: small fizzy lemonade droplets that fizz slightly"
+            ],
+            "safetyAppearance": "All environments look inviting and safe. Bridges clearly have handrails. Clouds look soft and thick for safe landings. No sharp objects or frightening elements. The Cloud Whale's shadow is just a darker cloud shape, not scary."
+          }
+        },
+        "outline": {
+          "episodeCount": 24,
+          "continuityCheck": {
+            "centralProblemProgression": "The Harmony Wind weakens progressively from episode 1 as Pippin loses his song. Mila and Pippin travel across the isles, meeting characters that teach sharing and bravery. At the midpoint (ep 11), they meet the Cloud Whale and realize it is not a threat. The low point occurs in episode 14 when they are stranded and the islands seem lost. In episodes 16-19, they build courage together, and in episode 20, Pippin's song with the whale's hum restores the wind, stronger than before. Episodes 23-24 show the resolution and celebration.",
+            "midpointEpisode": 11,
+            "lowPointEpisode": 14,
+            "finaleEpisodes": [
+              23,
+              24
+            ]
+          },
+          "firstEpisodes": [
+            {
+              "episodeNumber": 1,
+              "miniArcNumber": 1,
+              "title": "The Slack Bridge",
+              "storyPurpose": "Inciting incident: Mila discovers the rope bridge to Pear Isle has gone slack and finds Pippin crying under an apple tree, unable to sing.",
+              "conflict": "Pippin's song is gone, and the islands are already starting to drift apart.",
+              "vocabularyFocus": [
+                "help",
+                "listen"
+              ],
+              "expectedChoiceTheme": "Approaching Pippin gently vs. asking what's wrong directly",
+              "stateChangeGoal": "Mila decides to help Pippin find his song.",
+              "illustrationOpportunity": "Mila holding a fallen kite, looking at a sad Pippin next to glowing but dim apple trees.",
+              "cliffhangerOrHook": "Can Mila help Pippin sing again?"
+            },
+            {
+              "episodeNumber": 2,
+              "miniArcNumber": 1,
+              "title": "A Song of Sparkles",
+              "storyPurpose": "Mila tries playful exercises to get Pippin to sing, but only sparkles come out.",
+              "conflict": "Pippin tries but produces only tiny sparkles, no song; he is discouraged.",
+              "vocabularyFocus": [
+                "sing",
+                "fruit"
+              ],
+              "expectedChoiceTheme": "Trying a different game vs. taking a break",
+              "stateChangeGoal": "Pippin feels a little better but still can't sing; they notice the shadow on the highest island.",
+              "illustrationOpportunity": "Pippin sneezes and a plum pops out, both giggling.",
+              "cliffhangerOrHook": "What is that shadow on the highest island?"
+            },
+            {
+              "episodeNumber": 3,
+              "miniArcNumber": 1,
+              "title": "The Shadow Above",
+              "storyPurpose": "Pippin reveals he is scared of the shadow on Shadow Isle, which he thinks is a monster.",
+              "conflict": "Pippin's fear of the shadow prevents him from singing; Mila learns about the Cloud Whale rumor.",
+              "vocabularyFocus": [
+                "cloud",
+                "shadow"
+              ],
+              "expectedChoiceTheme": "Encouraging Pippin to be brave vs. ignoring his fear",
+              "stateChangeGoal": "Mila decides they must go to Shadow Isle to face the fear.",
+              "illustrationOpportunity": "Mila pointing at the distant shadowy island while Pippin hides behind a tree.",
+              "cliffhangerOrHook": "How will they get across the broken bridge?"
+            }
+          ],
+          "lastEpisodes": [
+            {
+              "episodeNumber": 23,
+              "miniArcNumber": 4,
+              "title": "Back to Apple Isle",
+              "storyPurpose": "Mila and Pippin travel back to Apple Isle to share the good news with everyone.",
+              "conflict": "No conflict—reunion with Squee and Whisk.",
+              "vocabularyFocus": [
+                "share",
+                "brave"
+              ],
+              "expectedChoiceTheme": "Sharing fruit vs. sharing stories",
+              "stateChangeGoal": "The community celebrates; Mila learns patience and listening pay off.",
+              "illustrationOpportunity": "Mila handing out apples to Squee and Whisk under the big apple tree.",
+              "cliffhangerOrHook": "One last surprise?"
+            },
+            {
+              "episodeNumber": 24,
+              "miniArcNumber": 4,
+              "title": "The Song of Harmony",
+              "storyPurpose": "Final celebration: all characters gather and sing together, strengthening the Harmony Wind permanently.",
+              "conflict": "No conflict—happy ending.",
+              "vocabularyFocus": [
+                "help",
+                "listen",
+                "share",
+                "brave"
+              ],
+              "expectedChoiceTheme": "Singing together vs. silent gratitude",
+              "stateChangeGoal": "The season ends with Mila and Pippin flying kites with the wind; moral: listening and sharing are the most powerful ways to help.",
+              "illustrationOpportunity": "All characters holding hands (paws, fins) under a sky full of sparkling fruit and rainbows.",
+              "cliffhangerOrHook": "The Floating Orchard Isles are safe—for good!"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "variant": {
+        "id": "pro_no_thinking",
+        "label": "DeepSeek V4 Pro, no thinking",
+        "model": "deepseek/deepseek-v4-pro",
+        "reasoning": {
+          "enabled": false
+        }
+      },
+      "steps": {
+        "framework": {
+          "latencyMs": 42774,
+          "usage": {
+            "prompt_tokens": 419,
+            "completion_tokens": 2179,
+            "total_tokens": 2598,
+            "cost": 0.008996354,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.008996354,
+              "upstream_inference_prompt_cost": 0.00072487,
+              "upstream_inference_completions_cost": 0.008271484
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "preview": "In the Floating Orchard Isles, where fruit trees drift among clouds and rope bridges sway in the wind, a cheerful girl named Mila discovers that her favorite Wind-Kite — one of the gentle breeze-makers that keeps the islands floating — has gone silent. Without it, her home island will slowly sink. To save it, she must journey across the isles, befriend a shy baby wind-dragon named Puff, and learn that true courage means listening to others and sharing your worries before you can help anyone else."
+        }
+      },
+      "scores": {
+        "framework": {
+          "score": 8,
+          "max": 8,
+          "issues": []
+        }
+      },
+      "totalLatencyMs": 42774,
+      "totalTokens": 2598,
+      "error": "Expected ',' or '}' after property value in JSON at position 16733 (line 206 column 4)"
+    },
+    {
+      "variant": {
+        "id": "pro_medium_thinking",
+        "label": "DeepSeek V4 Pro, thinking medium",
+        "model": "deepseek/deepseek-v4-pro",
+        "reasoning": {
+          "effort": "medium"
+        }
+      },
+      "steps": {},
+      "scores": {},
+      "totalLatencyMs": 0,
+      "totalTokens": 0,
+      "error": "Could not locate JSON object in model output: "
+    }
+  ],
+  "finishedAt": "2026-06-23T21:37:43.288Z",
+  "totalBenchmarkMs": 789848
+}

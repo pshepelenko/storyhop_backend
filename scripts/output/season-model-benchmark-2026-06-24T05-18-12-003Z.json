@@ -1,0 +1,1598 @@
+{
+  "startedAt": "2026-06-24T05:18:12.004Z",
+  "methodology": {
+    "steps": [
+      "framework",
+      "bible",
+      "outline_2_batches",
+      "continuity_check"
+    ],
+    "outlineEpisodeCount": 24,
+    "flashProvider": "baidu/fp8",
+    "repairModel": "deepseek/deepseek-v4-flash"
+  },
+  "childProfile": {
+    "childName": "Mila",
+    "childAge": "7",
+    "languageLevel": "A1"
+  },
+  "seasonSetup": {
+    "theme": "friendship and courage",
+    "world": "The Floating Orchard Isles — tiny islands of fruit trees connected by rope bridges and wind kites",
+    "vocabularyFocus": [
+      "help",
+      "listen",
+      "brave",
+      "share"
+    ],
+    "preferredTone": "warm, adventurous, gently funny",
+    "comments": "Child loves dragons but keep them friendly helpers, not scary monsters."
+  },
+  "variants": [
+    {
+      "variant": {
+        "id": "flash_no_thinking",
+        "label": "DeepSeek V4 Flash, no thinking",
+        "model": "deepseek/deepseek-v4-flash",
+        "reasoning": {
+          "enabled": false
+        },
+        "provider": "baidu/fp8 (fallback ok)"
+      },
+      "steps": {
+        "framework": {
+          "latencyMs": 15533,
+          "usage": {
+            "prompt_tokens": 375,
+            "completion_tokens": 1405,
+            "total_tokens": 1780,
+            "cost": 0.0002983873,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 187,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0002983873,
+              "upstream_inference_prompt_cost": 0.0000221643,
+              "upstream_inference_completions_cost": 0.000276223
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "provider": "Baidu",
+          "repaired": false,
+          "preview": "In the Floating Orchard Isles, where islands of fruit trees drift in the sky connected by rope bridges and wind kites, young Mila and her gentle dragon friend Ember must learn to listen and help each other to save their home from a strange, silent fog that makes the fruit trees stop sharing their sweetness."
+        },
+        "bible": {
+          "latencyMs": 17645,
+          "usage": {
+            "prompt_tokens": 1096,
+            "completion_tokens": 1881,
+            "total_tokens": 2977,
+            "cost": 0.0004431146,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 438,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0004431146,
+              "upstream_inference_prompt_cost": 0.00007331,
+              "upstream_inference_completions_cost": 0.0003698046
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "provider": "Baidu",
+          "repaired": false,
+          "preview": "The Floating Orchard Isles are a cluster of lush, drifting islands suspended in a soft blue sky, connected by rope bridges and wind kites. Each island is home to unique fruit trees that glow and hum with sweetness, sustained by the magic of sharing and community. The islands float gently, and the air is filled with the scent of blossoms and the distant chime of wind chimes. The central island, Great Orchard Isle, is the largest and most vibrant, where festivals are held and the Great Golden Apple Tree stands as a symbol of the islands' magic."
+        },
+        "outline": {
+          "latencyMs": 321716,
+          "episodeCount": 47,
+          "batches": [
+            {
+              "range": "1-12",
+              "latencyMs": 295098,
+              "repaired": false,
+              "count": 35
+            },
+            {
+              "range": "13-24",
+              "latencyMs": 24872,
+              "repaired": false,
+              "count": 12
+            }
+          ],
+          "preview": "The silent fog spreads from the far edge, making fruit trees lose their sweetness. Mila and Ember learn to listen and help others, discovering the fog is a protective tear from a lonely Whisper Tree. They must share a brave story to restore the tree and heal all islands."
+        }
+      },
+      "scores": {
+        "framework": {
+          "score": 7,
+          "max": 8,
+          "issues": [
+            "generic or missing incitingIncident"
+          ]
+        },
+        "bible": {
+          "score": 7,
+          "max": 7,
+          "issues": []
+        },
+        "outline": {
+          "score": 8,
+          "max": 8,
+          "issues": []
+        },
+        "total": {
+          "score": 22,
+          "max": 23
+        }
+      },
+      "totalLatencyMs": 354894,
+      "totalTokens": 21577,
+      "error": null,
+      "success": true,
+      "artifacts": {
+        "framework": {
+          "seasonPremise": "In the Floating Orchard Isles, where islands of fruit trees drift in the sky connected by rope bridges and wind kites, young Mila and her gentle dragon friend Ember must learn to listen and help each other to save their home from a strange, silent fog that makes the fruit trees stop sharing their sweetness.",
+          "centralProblem": "A mysterious quiet fog has begun to drift through the Floating Orchard Isles, making the fruit trees go silent and their fruit taste bland. If the fog spreads, the islands will lose their magic and the community will have to leave.",
+          "dramaticQuestion": "Can Mila and Ember, by learning to listen and help one another, discover the secret of the silent fog and restore the sweetness to the islands?",
+          "externalStakes": "The Floating Orchard Isles will lose their magical fruit, the rope bridges will weaken, and all the families will have to move away.",
+          "emotionalStakes": "Mila will lose her home and her best friend Ember if she cannot find the courage to trust others and share her feelings.",
+          "heroWant": "Mila wants to stop the fog and save the islands so she can stay with Ember and her friends.",
+          "heroNeed": "Mila needs to learn that being brave means listening to others and asking for help, not just doing everything alone.",
+          "antagonisticForce": "The Silent Fog is a natural force born from the islands' sadness when no one shares or listens. It is not evil, but it grows stronger when people forget to help each other.",
+          "rulesOfWorld": "Each island has a special fruit tree that glows when someone shares something kind. Rope bridges connect the islands, but they sway and can break if not cared for. Wind kites carry messages and small gifts. The fog only comes when people stop listening and helping. Dragons like Ember can breathe warm, gentle breezes that can clear small patches of fog.",
+          "incitingIncident": "During a fruit-picking festival on the biggest island, Mila notices that the Great Golden Apple Tree has stopped glowing and its apples taste like water. Ember sniffs the air and sees a thin, silvery fog creeping in from the far edge of the isles.",
+          "pointOfNoReturn": "Mila and Ember decide to fly across the rope bridges to the farthest, fog-shrouded island to find the source of the silence, even though no one has been there in years.",
+          "miniArcPlan": [
+            {
+              "arcNumber": 1,
+              "episodesRange": "1-7",
+              "localGoal": "Mila and Ember must help the nearby islands by listening to the trees and the people to learn what the fog fears.",
+              "mainObstacle": "Mila wants to rush ahead alone, but the trees only whisper when someone listens patiently.",
+              "storyFunction": "Establish the world, introduce the fog's effects, and teach the first lesson about listening."
+            },
+            {
+              "arcNumber": 2,
+              "episodesRange": "8-14",
+              "localGoal": "Cross the broken rope bridge to the middle island and convince the shy cloud bunnies to share their secret of fog-repelling berries.",
+              "mainObstacle": "The cloud bunnies are too scared to come out, and Mila must earn their trust by helping them first.",
+              "storyFunction": "Deepen the adventure, introduce new friends, and show the value of helping others before asking for help."
+            },
+            {
+              "arcNumber": 3,
+              "episodesRange": "15-21",
+              "localGoal": "Reach the fog island and find the ancient Whisper Tree that holds the key to stopping the fog.",
+              "mainObstacle": "The fog is thickest here and makes Ember feel sleepy; Mila must be brave and use what she has learned about listening and sharing to find the tree.",
+              "storyFunction": "The midpoint reversal and low point occur here, testing Mila's courage and forcing her to rely on Ember and new friends."
+            },
+            {
+              "arcNumber": 4,
+              "episodesRange": "22-30",
+              "localGoal": "Restore the Whisper Tree by sharing a brave story and a kind act, then fly back to spread the healing magic across all the islands.",
+              "mainObstacle": "The fog tries one last time to silence them, and Mila must lead everyone in a song of sharing to break its hold.",
+              "storyFunction": "Final challenge, resolution, and celebration of change."
+            }
+          ],
+          "midpointReversal": "At the fog island, Mila and Ember discover the Whisper Tree is not sick—it is lonely because no one has shared a story with it for years. The fog is actually a protective tear. If they share something true and kind, the tree will bloom again and the fog will lift.",
+          "lowPoint": "Ember tries to breathe a warm breeze to clear the fog around the tree, but it backfires and the fog grows thicker, separating Mila from Ember. Mila feels all alone and fears she has failed her friend.",
+          "finalChallenge": "Mila must stand alone before the Whisper Tree, overcome her fear, and share a brave, honest story about why she loves the islands and her friends. She must also forgive herself for making mistakes.",
+          "resolution": "Mila shares her story, the Whisper Tree glows brilliantly, the fog dissolves into sparkling dew, and the fruit trees across all islands burst into sweet, glowing fruit. The community celebrates with a grand sharing feast, and Mila learns that bravery comes from listening, helping, and sharing.",
+          "characterChange": "Mila starts as a headstrong girl who tries to solve everything alone, but by the end she learns to listen to others, ask for help, and share her feelings. She becomes a true friend and leader.",
+          "safetyBoundaries": "No real danger or violence. The fog is never scary—just mysterious and sad. Ember the dragon is always gentle and friendly. Rope bridges sway but never break in a way that causes harm. All conflicts are resolved with kindness, listening, and sharing.",
+          "toneGuide": "Warm, adventurous, gently funny. Ember sometimes sneezes sparkles. Cloud bunnies are shy but silly. The Whisper Tree has a rumbling, kind voice. Mila's mistakes are treated with gentle humor and learning, not punishment.",
+          "vocabularyFocus": [
+            "help",
+            "listen",
+            "brave",
+            "share"
+          ]
+        },
+        "bible": {
+          "worldOverview": "The Floating Orchard Isles are a cluster of lush, drifting islands suspended in a soft blue sky, connected by rope bridges and wind kites. Each island is home to unique fruit trees that glow and hum with sweetness, sustained by the magic of sharing and community. The islands float gently, and the air is filled with the scent of blossoms and the distant chime of wind chimes. The central island, Great Orchard Isle, is the largest and most vibrant, where festivals are held and the Great Golden Apple Tree stands as a symbol of the islands' magic.",
+          "worldRules": [
+            "Fruit trees glow and produce sweet fruit when the community shares stories, songs, or kind acts.",
+            "The silent fog appears when a tree feels lonely or unheard; it makes fruit taste bland and trees stop glowing.",
+            "The fog can be dispelled by sharing a true, kind story or act of listening with the affected tree.",
+            "Wind kites and rope bridges connect the islands, but some bridges may be broken or foggy, requiring courage or help to cross.",
+            "Ember's warm breath can clear small patches of fog, but too much can make the fog thicker if used without understanding.",
+            "Cloud bunnies are shy and only appear when they feel safe; they can share secret knowledge if helped first."
+          ],
+          "mainLocations": [
+            {
+              "name": "Great Orchard Isle",
+              "description": "The largest island, home to the Great Golden Apple Tree and the community's festival grounds. It has a central plaza with a stage, a market of fruit stalls, and a library of story scrolls. The fog first appears here during the fruit-picking festival."
+            },
+            {
+              "name": "Whisper Island",
+              "description": "A smaller, misty island at the far edge of the isles, where the ancient Whisper Tree grows. The tree has a rumbling, kind voice and is covered in silver leaves. The fog is thickest here, and the tree is revealed to be lonely."
+            },
+            {
+              "name": "Bunny Hollow",
+              "description": "A floating meadow island covered in soft, puffy grass and berry bushes. It is home to the shy cloud bunnies, who hide in burrows and only come out when they feel safe. The berries here can repel fog temporarily."
+            },
+            {
+              "name": "Bridge of Winds",
+              "description": "A long, swaying rope bridge connecting Great Orchard Isle to the middle islands. It is often windy and some planks are missing, requiring careful steps and teamwork to cross."
+            },
+            {
+              "name": "Fog's Edge",
+              "description": "The outer boundary of the isles where the fog first appears. It is a quiet, eerie area with faint whispers and glowing fog particles. Mila and Ember venture here to investigate the source of the fog."
+            }
+          ],
+          "mainCharacters": [
+            {
+              "name": "Mila",
+              "age": 7,
+              "role": "Hero",
+              "description": "A curious and brave 7-year-old girl who loves exploring the islands with her dragon friend. She is impulsive and wants to solve problems alone, but learns to listen and ask for help. She has a kind heart and a love for stories.",
+              "characteristics": [
+                "Curious and adventurous",
+                "Sometimes rushes into things",
+                "Learns to listen and share"
+              ]
+            },
+            {
+              "name": "Ember",
+              "age": "Young dragon (equivalent to 8 human years)",
+              "role": "Friend and companion",
+              "description": "A gentle, small dragon with warm orange scales and sparkly sneezes. He can breathe a warm breeze and loves to fly. He is patient and loyal, often guiding Mila with his calm presence. He gets sleepy in thick fog.",
+              "characteristics": [
+                "Gentle and patient",
+                "Sneezes sparkles when excited or nervous",
+                "Loves to fly and explore"
+              ]
+            },
+            {
+              "name": "The Whisper Tree",
+              "age": "Ancient",
+              "role": "Guardian of the islands' magic",
+              "description": "A massive tree with silver leaves that rustle like whispers. It has a deep, rumbling, kind voice. It is lonely because no one has shared a story with it for years. It reacts to true, kind stories by glowing and blooming.",
+              "characteristics": [
+                "Ancient and wise",
+                "Speaks in a rumbling, kind voice",
+                "Responds to stories and kindness"
+              ]
+            },
+            {
+              "name": "Cloud Bunnies",
+              "age": "Various",
+              "role": "Shy helpers",
+              "description": "Small, fluffy creatures that look like clouds with rabbit ears. They are very shy and hide in burrows on Bunny Hollow. They know the secret of fog-repelling berries but only share it with someone who helps them first.",
+              "characteristics": [
+                "Shy and timid",
+                "Fluffy and soft",
+                "Silly when they feel safe"
+              ]
+            },
+            {
+              "name": "Great Golden Apple Tree",
+              "age": "Very old",
+              "role": "Symbol of the islands' magic",
+              "description": "A tall, glowing tree with golden apples that taste incredibly sweet. It stops glowing and its apples become bland when the fog first appears. It is located on Great Orchard Isle and is central to the inciting incident."
+            }
+          ],
+          "seasonContinuityRules": [
+            "Each episode builds on the previous one: new vocabulary and phrases are introduced in context and reviewed in the next episode.",
+            "The fog spreads gradually across episodes, with each arc focusing on a different island or challenge.",
+            "Mila's growth from impulsive to collaborative is shown through her actions and dialogue, not just narration.",
+            "Ember's sparkly sneezes are a recurring humorous element, used to lighten tense moments.",
+            "Cloud bunnies appear only when Mila demonstrates kindness or help, reinforcing the lesson of helping others.",
+            "The Whisper Tree's voice is consistent: deep, slow, and kind, with a slight echo.",
+            "The resolution of each mini-arc (e.g., fixing a bridge, earning trust) provides a sense of accomplishment and introduces new vocabulary for the next arc."
+          ],
+          "vocabularyPlan": {
+            "coreWords": [
+              "apple",
+              "tree",
+              "fog",
+              "listen",
+              "help",
+              "share",
+              "story",
+              "sweet",
+              "brave",
+              "friend",
+              "fly",
+              "island",
+              "bridge",
+              "bunny",
+              "berry",
+              "golden",
+              "glow",
+              "whisper",
+              "kind",
+              "sing"
+            ],
+            "actionPhrases": [
+              "Listen carefully.",
+              "Can you help me?",
+              "Let's share a story.",
+              "Be brave!",
+              "I am your friend.",
+              "The tree is glowing.",
+              "The fog is coming.",
+              "Please tell me.",
+              "We can do it together.",
+              "Thank you for helping."
+            ],
+            "reviewCadence": "New vocabulary is introduced in context in each episode, with a quick review at the start of the next episode using a fun game (e.g., 'find the word' or 'match the picture'). Every 5 episodes, a cumulative review episode reinforces all vocabulary from the previous arc. The review cadence is: episode 1-2 (introduce), episode 3 (review), episode 4-5 (introduce new), episode 6 (review all so far), and so on."
+          },
+          "rewardLogic": "When Mila successfully listens to a tree, helps a character, or shares a story, the player earns a 'Sparkle Fruit' that appears in a collection jar. Collecting 5 Sparkle Fruits unlocks a bonus story page or a new song. The reward is tied directly to the lesson: listening, helping, or sharing. The jar fills gradually, and each fruit gives a positive sound effect and visual sparkle. Ember also sneezes sparkles as a mini-reward for correct answers or choices.",
+          "illustrationStyleGuide": "The visual style is warm, soft, and whimsical, with rounded shapes and pastel colors. Islands are depicted as floating discs with lush greenery and glowing fruit. Characters have simple, expressive faces with large eyes. Ember is orange with sparkly accents. Fog is illustrated as a soft, silvery mist with tiny glittering particles. The Whisper Tree has silver leaves that shimmer. Cloud bunnies are white and fluffy with pink ears. The overall feel is cozy and magical, suitable for young children."
+        },
+        "outline": {
+          "episodeCount": 47,
+          "continuityCheck": {
+            "centralProblemProgression": "The silent fog spreads from the far edge, making fruit trees lose their sweetness. Mila and Ember learn to listen and help others, discovering the fog is a protective tear from a lonely Whisper Tree. They must share a brave story to restore the tree and heal all islands.",
+            "midpointEpisode": 12,
+            "lowPointEpisode": 20,
+            "finaleEpisodes": [
+              29,
+              30
+            ]
+          },
+          "firstEpisodes": [
+            {
+              "episodeNumber": 1,
+              "miniArcNumber": 1,
+              "title": "The Great Golden Apple",
+              "storyPurpose": "Introduce Mila, Ember, and the world. The Great Golden Apple Tree stops glowing and its apples taste bland, showing the fog's first effect.",
+              "conflict": "Mila wants to fix the tree alone, but Ember urges her to listen to the tree's silence first.",
+              "vocabularyFocus": [
+                "apple",
+                "tree",
+                "fog",
+                "listen",
+                "friend",
+                "golden"
+              ],
+              "expectedChoiceTheme": "Listening vs. rushing",
+              "stateChangeGoal": "Mila notices the tree's change and agrees to wait and listen with Ember.",
+              "illustrationOpportunity": "Mila and Ember stand before the dull, unglowing Great Golden Apple Tree as a thin silver fog drifts in the distance.",
+              "cliffhangerOrHook": "Mila hears a faint whisper from the tree—but it's not the tree; it's the wind carrying a message from far away."
+            },
+            {
+              "episodeNumber": 2,
+              "miniArcNumber": 1,
+              "title": "Whispers on the Wind",
+              "storyPurpose": "Mila learns that the trees only whisper when someone listens patiently. She and Ember visit a smaller island where the Pear Tree is losing its sweetness.",
+              "conflict": "Mila wants to shake the Pear Tree to make it share, but Ember shows her that sitting quietly and listening is the only way.",
+              "vocabularyFocus": [
+                "listen",
+                "whisper",
+                "pear",
+                "sweet",
+                "help",
+                "island"
+              ],
+              "expectedChoiceTheme": "Patience vs. impatience",
+              "stateChangeGoal": "Mila sits still and hears the Pear Tree's faint hum—it says the fog is afraid of something 'shared'.",
+              "illustrationOpportunity": "Mila and Ember sit under the Pear Tree, eyes closed, as a soft golden hum glows around them.",
+              "cliffhangerOrHook": "A cloud bunny peeks from a bush, then vanishes—Mila realizes they might know more."
+            },
+            {
+              "episodeNumber": 3,
+              "miniArcNumber": 1,
+              "title": "The Shy Cloud Bunny",
+              "storyPurpose": "Review vocabulary from episodes 1-2. Mila tries to follow the cloud bunny but fails because she scares it by running too fast.",
+              "conflict": "Mila's eagerness frightens the bunny away. Ember suggests they bring a gift of berries to show they are kind.",
+              "vocabularyFocus": [
+                "bunny",
+                "berry",
+                "friend",
+                "help",
+                "kind",
+                "listen"
+              ],
+              "expectedChoiceTheme": "Earning trust through kindness",
+              "stateChangeGoal": "Mila and Ember leave a small pile of berries, and the bunny returns to nibble them, watching them warily.",
+              "illustrationOpportunity": "Tiny cloud bunny peeking from behind a bush, nibbling a berry while Mila and Ember sit very still nearby.",
+              "cliffhangerOrHook": "The bunny hops closer and drops a single shiny seed at Mila's feet."
+            }
+          ],
+          "lastEpisodes": [
+            {
+              "episodeNumber": 30,
+              "miniArcNumber": 4,
+              "title": "The Whisper Tree's Gift",
+              "storyPurpose": "The Whisper Tree gives each island a 'story seed'—a seed that will grow into a tree that listens and remembers.",
+              "conflict": "Mila worries that if everyone has a story tree, they might not visit the Whisper Tree anymore. The tree reassures her that sharing multiplies magic.",
+              "vocabularyFocus": [
+                "gift",
+                "seed",
+                "grow",
+                "remember",
+                "magic",
+                "share"
+              ],
+              "expectedChoiceTheme": "Generosity and letting go",
+              "stateChangeGoal": "Mila plants her seed on the new island, and it sprouts immediately into a sapling. She promises to visit it with a new story every week.",
+              "illustrationOpportunity": "Mila planting the seed as the Whisper Tree's branches glow, and the sapling's first leaves unfurl.",
+              "cliffhangerOrHook": "The sapling whispers: 'Tell me a story tomorrow.' Mila smiles and says, 'I will.'"
+            },
+            {
+              "episodeNumber": 30,
+              "miniArcNumber": 4,
+              "title": "The Forever Song",
+              "storyPurpose": "Final episode. Mila and Ember sit under the Whisper Tree with all their friends. They sing a song that tells the story of their adventure.",
+              "conflict": "Mila worries the song might not be perfect, but Ember sneezes sparkles, and everyone joins in. The song becomes the island's new lullaby.",
+              "vocabularyFocus": [
+                "song",
+                "friend",
+                "listen",
+                "help",
+                "story",
+                "forever"
+              ],
+              "expectedChoiceTheme": "Celebration and continuity",
+              "stateChangeGoal": "The song spreads across all islands, and the fog is remembered only as a story. The islands are safe, and the magic lives on.",
+              "illustrationOpportunity": "Mila and Ember at the center of a glowing circle of all the islanders, trees, bunnies, and stars above, all singing together.",
+              "cliffhangerOrHook": "A new star appears in the sky—the Heart Star, which will watch over the islands forever. The end is a beginning."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "variant": {
+        "id": "flash_medium_thinking",
+        "label": "DeepSeek V4 Flash, thinking medium",
+        "model": "deepseek/deepseek-v4-flash",
+        "reasoning": {
+          "effort": "medium"
+        },
+        "provider": "baidu/fp8 (fallback ok)"
+      },
+      "steps": {
+        "framework": {
+          "latencyMs": 30689,
+          "usage": {
+            "prompt_tokens": 375,
+            "completion_tokens": 3059,
+            "total_tokens": 3434,
+            "cost": 0.0006235637,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 187,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0006235637,
+              "upstream_inference_prompt_cost": 0.0000221643,
+              "upstream_inference_completions_cost": 0.0006013994
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1491,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "provider": "Baidu",
+          "repaired": false,
+          "preview": "When Mila arrives at the Floating Orchard Isles, she discovers that the magical wind kites—which connect the islands and power the Wind Kite Festival—are losing their lift because the four Gust Gems have been scattered. With the help of a friendly little dragon named Sparkle, Mila must journey across the islands to find the gems, learning to help, listen, be brave, and share along the way."
+        },
+        "bible": {
+          "latencyMs": 19974,
+          "usage": {
+            "prompt_tokens": 1159,
+            "completion_tokens": 1767,
+            "total_tokens": 2926,
+            "cost": 0.000459914,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.000459914,
+              "upstream_inference_prompt_cost": 0.000113582,
+              "upstream_inference_completions_cost": 0.000346332
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 259,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "provider": "GMICloud",
+          "repaired": false,
+          "preview": "The Floating Orchard Isles are a cluster of magical islands suspended in the sky, connected by rope bridges and wind currents. The islands are lush with fruit trees, colorful flowers, and playful creatures. The Wind Kite Festival is the central event where giant kites soar between islands using the power of four Gust Gems. The islands are cheerful, safe, and full of gentle magic."
+        },
+        "outline": {
+          "latencyMs": 518354,
+          "episodeCount": 24,
+          "batches": [
+            {
+              "range": "1-12",
+              "latencyMs": 462631,
+              "repaired": false,
+              "count": 12
+            },
+            {
+              "range": "13-24",
+              "latencyMs": 44283,
+              "repaired": false,
+              "count": 12
+            }
+          ],
+          "preview": "Mila arrives to find the four Gust Gems scattered; she learns to help in Whistling Grove (gem 1), listens in Echo Grotto (gem 2), overcomes fear at Windy Peak (gem 3), and shares in Sharing Meadow (gem 4), restoring the gems and saving the Wind Kite Festival."
+        }
+      },
+      "scores": {
+        "framework": {
+          "score": 8,
+          "max": 8,
+          "issues": []
+        },
+        "bible": {
+          "score": 7,
+          "max": 7,
+          "issues": []
+        },
+        "outline": {
+          "score": 8,
+          "max": 8,
+          "issues": []
+        },
+        "total": {
+          "score": 23,
+          "max": 23
+        }
+      },
+      "totalLatencyMs": 569017,
+      "totalTokens": 21240,
+      "error": null,
+      "success": true,
+      "artifacts": {
+        "framework": {
+          "seasonPremise": "When Mila arrives at the Floating Orchard Isles, she discovers that the magical wind kites—which connect the islands and power the Wind Kite Festival—are losing their lift because the four Gust Gems have been scattered. With the help of a friendly little dragon named Sparkle, Mila must journey across the islands to find the gems, learning to help, listen, be brave, and share along the way.",
+          "centralProblem": "The four Gust Gems that make the wind kites soar have been scattered across the islands. Without them, the kites won't fly, the islands will become isolated, and the Wind Kite Festival cannot happen.",
+          "dramaticQuestion": "Can Mila overcome her fears and learn to help, listen, be brave, and share in time to find all four Gust Gems and save the festival?",
+          "externalStakes": "The Wind Kite Festival will be cancelled; families won't be able to visit one another; the islands will lose their joyful connection.",
+          "emotionalStakes": "Mila feels lonely and unsure of herself in a new place. She desperately wants to make friends and belong, but her shyness and fear of heights hold her back.",
+          "heroWant": "Mila wants to join the Wind Kite Festival and make friends with the island children and Sparkle.",
+          "heroNeed": "Mila needs to discover that true courage comes from helping others, listening carefully, sharing generously, and being brave even when she feels scared.",
+          "antagonisticForce": "Not a villain, but a natural challenge: the Gust Gems are hidden in tricky, whimsical spots (inside a shy cloud, under a grumpy tree root, on a high peak). Mila's own fear of heights and self-doubt are also forces she must overcome.",
+          "rulesOfWorld": [
+            "Each island grows a special kind of fruit (jingleberries, whirlypears, moonmelons, starapples).",
+            "Wind kites are magical and need Gust Gems to fly safely between islands.",
+            "Only those who show bravery, listening, helping, and sharing can reveal where a Gust Gem is hidden.",
+            "Sparkle the dragon is friendly, small, and her sneezes create tiny sparkles that sometimes give clues.",
+            "Rope bridges are safe but wobbly; wind kites can carry riders if they hold on tight by the handle.",
+            "The islanders are welcoming but love to tell riddles and make new friends prove themselves through kind deeds."
+          ],
+          "incitingIncident": "Mila steps onto the main island just as the Head Gardener announces that the last Gust Gem has disappeared. A little dragon named Sparkle lands right in front of her, nuzzles her hand, and then flies a short way toward a winding rope bridge, looking back as if to say 'Follow me!'",
+          "pointOfNoReturn": "Mila decides to follow Sparkle across the first rope bridge, leaving the safety of the main island and officially setting out to find the first Gust Gem.",
+          "miniArcPlan": [
+            {
+              "arcNumber": 1,
+              "episodesRange": "1-7",
+              "localGoal": "Find the first Gust Gem hidden in the Whistling Grove.",
+              "mainObstacle": "A shy squirrel has the gem but only gives it up after Mila helps him gather enough jingleberries for his family's winter store.",
+              "storyFunction": "Introduce the world, Sparkle, and the concept of helping others to solve problems."
+            },
+            {
+              "arcNumber": 2,
+              "episodesRange": "8-14",
+              "localGoal": "Find the second Gust Gem hidden in the Echo Grotto.",
+              "mainObstacle": "The gem is inside a cave that only opens when Mila listens carefully to a melodic wind pattern and sings it back correctly.",
+              "storyFunction": "Deepen the quest by teaching Mila the importance of listening—not just with ears, but with attention and patience."
+            },
+            {
+              "arcNumber": 3,
+              "episodesRange": "15-21",
+              "localGoal": "Find the third Gust Gem resting on the Windy Peak.",
+              "mainObstacle": "Mila must cross a very high, swaying rope bridge. She is terrified of heights and freezes mid-way.",
+              "storyFunction": "Challenge Mila's courage and provide a moment of emotional growth as she overcomes her fear."
+            },
+            {
+              "arcNumber": 4,
+              "episodesRange": "22-28",
+              "localGoal": "Find the fourth Gust Gem in the Sharing Meadow.",
+              "mainObstacle": "The gem is split into four pieces, and Mila must share her own snacks and credit with other children playing there so they will pool their pieces together.",
+              "storyFunction": "Culminate the vocabulary focus on sharing and teamwork, leading to the final restoration."
+            }
+          ],
+          "midpointReversal": "After successfully obtaining two Gust Gems, Mila and Sparkle are caught in a sudden playful whirlwind. Sparkle is swept to a distant island, and Mila lands alone on an unfamiliar isle. She realizes the quest isn't just about collecting gems—she must now rely on everything she has learned (helping and listening) to find her friend again.",
+          "lowPoint": "During the third arc, Mila stops on the high rope bridge, too scared to move forward or backward. She sits down and cries, feeling like a failure and thinking she should give up. Sparkle can't push her—Mila must find the courage inside herself to take the next step.",
+          "finalChallenge": "In the Sharing Meadow, the last Gust Gem is in the hands of a grumpy giant moonmelon who refuses to give it up until Mila proves she can share. Mila must share her last whirlyfruit snack with the giant and also invite three other children to help piece the gem together, crediting them equally.",
+          "resolution": "Mila and Sparkle place all four Gust Gems into the central wind kite. The kite lifts off, glowing brightly. The festival begins with music and fruit feasts. Mila is cheered by the islanders, makes new friends, and rides Sparkle on a kite over the islands—feeling proud and no longer afraid.",
+          "characterChange": "Mila begins as a shy, uncertain child who feels alone and fears new experiences. By the end, she is confident, brave, and understands that helping, listening, being brave, and sharing are the real keys to friendship and belonging.",
+          "safetyBoundaries": "All bridges are safe but described as wobbly; heights are treated as exciting rather than terrifying. Sparkle is always friendly and comforting. There are no real monsters or dangers: obstacles are gentle puzzles, shy animals, or natural challenges with warm, positive outcomes. An adult gardener or parent is always nearby offscreen to ensure safety.",
+          "toneGuide": "Warm, adventurous, and gently funny. Use playful language, light humor (like Sparkle's sparkly sneezes), and encouraging dialogue. Every challenge ends with a small celebration. Aim to make Mila (and the listener) feel capable and proud. Avoid any sense of real peril—frame difficulty as 'tricky but fun.'"
+        },
+        "bible": {
+          "worldOverview": "The Floating Orchard Isles are a cluster of magical islands suspended in the sky, connected by rope bridges and wind currents. The islands are lush with fruit trees, colorful flowers, and playful creatures. The Wind Kite Festival is the central event where giant kites soar between islands using the power of four Gust Gems. The islands are cheerful, safe, and full of gentle magic.",
+          "worldRules": [
+            "Wind kites only fly when all four Gust Gems are placed in the central kite at the main island.",
+            "Each Gust Gem is hidden on a different island and requires a specific challenge to obtain.",
+            "Sparkle the dragon can fly short distances and has a sparkly sneeze that reveals hidden paths or clues.",
+            "The islands are connected by rope bridges, but some areas require solving puzzles or showing kindness to cross.",
+            "The giant moonmelon in the Sharing Meadow only shares if you share with him first."
+          ],
+          "mainLocations": [
+            {
+              "name": "Main Island (Kite Plaza)",
+              "description": "The central island where the festival takes place. Has the central wind kite and the Head Gardener's hut. First encounter with Sparkle."
+            },
+            {
+              "name": "Whistling Grove",
+              "description": "A forest of musical trees that whistle in the wind. Home to shy squirrels and jingleberry bushes. First Gust Gem location."
+            },
+            {
+              "name": "Echo Grotto",
+              "description": "A cave that only opens when you sing the correct wind melody. Inside are echoing crystals and the second Gust Gem."
+            },
+            {
+              "name": "Windy Peak",
+              "description": "A high mountain island with a swaying rope bridge over a misty valley. The third Gust Gem rests on the peak."
+            },
+            {
+              "name": "Sharing Meadow",
+              "description": "A sunny meadow where children play with hoop-rolling and fruit-snack trading. Home to the grumpy giant moonmelon. Fourth Gust Gem is split into pieces."
+            }
+          ],
+          "mainCharacters": [
+            {
+              "name": "Mila",
+              "age": 7,
+              "role": "Hero",
+              "description": "A curious and kind-hearted girl who loves adventures but is sometimes shy or scared. She learns to help, listen, be brave, and share."
+            },
+            {
+              "name": "Sparkle",
+              "age": "young dragon",
+              "role": "Companion",
+              "description": "A small, friendly dragon with sparkly blue scales. He communicates through chirps and gestures, and his sneezes release glittery sparks that reveal clues. He nudges Mila forward when she hesitates."
+            },
+            {
+              "name": "Head Gardener",
+              "role": "Mentor",
+              "description": "A wise old man who tends the island gardens. He announces the loss of the Gust Gems and gives Mila the initial quest. He appears occasionally to offer encouragement."
+            },
+            {
+              "name": "Shy Squirrel",
+              "role": "Helper",
+              "description": "A small squirrel who has the first Gust Gem. He is nervous about meeting his family's winter needs. He gives the gem after Mila helps gather jingleberries."
+            },
+            {
+              "name": "Giant Moonmelon",
+              "role": "Gatekeeper",
+              "description": "A large, grumpy fruit creature who holds the pieces of the fourth gem. He softens when Mila shares her snack and invites others to help."
+            }
+          ],
+          "seasonContinuityRules": [
+            "Each episode begins with a brief recap of previous events using a 'story so far' sequence with simple visuals and vocabulary.",
+            "Episodes within an arc reference the specific skill (helping, listening, etc.) being learned, and the arc's goal is restated in each episode.",
+            "After completing an arc, Mila and Sparkle celebrate by flying a small kite to the next island, reinforcing the festival theme.",
+            "Core vocabulary from earlier arcs is reviewed in later arcs, especially during interactions with characters the child has met before."
+          ],
+          "vocabularyPlan": {
+            "coreWords": [
+              "kite",
+              "gem",
+              "island",
+              "help",
+              "listen",
+              "brave",
+              "share",
+              "friend",
+              "festival",
+              "sing",
+              "fly",
+              "find",
+              "bridge",
+              "cave",
+              "meadow",
+              "squirrel",
+              "dragon",
+              "fruit",
+              "snack",
+              "piece"
+            ],
+            "actionPhrases": [
+              "Can you help me?",
+              "Listen carefully!",
+              "Be brave!",
+              "Let's share!",
+              "Follow me!",
+              "Well done!",
+              "Try again!",
+              "You did it!"
+            ],
+            "reviewCadence": "Every 3 episodes, review core words from the previous 3 episodes using a simple matching game or fill-in-the-blank. At the end of each arc, review all key words from that arc. The final episode of the season reviews all 20 core words."
+          },
+          "rewardLogic": {
+            "type": "stars and kite pieces",
+            "earning": "Every time Mila completes a task (e.g., helps the squirrel, sings the melody, crosses the bridge, shares the snack), the child earns a star. After collecting 5 stars, the child earns a kite piece. There are 4 kite pieces total (one per arc). After collecting all 4, the final episode shows the kite flying high.",
+            "visualFeedback": "Stars appear on screen with a cheerful chime. Kite pieces are added to a progress bar shaped like a kite."
+          },
+          "illustrationStyleGuide": {
+            "artStyle": "Warm, storybook watercolor with soft edges. Bright but not harsh colors. Characters are round and friendly.",
+            "colorPalette": {
+              "sky": "soft blue to lavender gradients",
+              "islands": "emerald green and golden yellow",
+              "kites": "rainbow hues with glitter accents",
+              "characters": "Mila in a red dress, Sparkle in teal and silver, other characters in earthy tones"
+            },
+            "characterDesign": {
+              "Mila": "7-year-old girl with brown pigtails, large expressive eyes, and a red dress with white polka dots. She wears a small backpack.",
+              "Sparkle": "Small dragon with teal scales, silver belly, and tiny wings. His eyes are big and sparkly. He often has a playful expression.",
+              "Backgrounds": "Lush with fruits and flowers. Rope bridges have wooden planks and rope rails. Caves have glowing crystals. Islands float with soft clouds below."
+            },
+            "animation": "Gentle, slow-paced movements. Kites bob in the breeze, Sparkle's wings flutter, leaves rustle. No fast or sudden motions."
+          }
+        },
+        "outline": {
+          "episodeCount": 24,
+          "continuityCheck": {
+            "centralProblemProgression": "Mila arrives to find the four Gust Gems scattered; she learns to help in Whistling Grove (gem 1), listens in Echo Grotto (gem 2), overcomes fear at Windy Peak (gem 3), and shares in Sharing Meadow (gem 4), restoring the gems and saving the Wind Kite Festival.",
+            "midpointEpisode": 12,
+            "lowPointEpisode": 20,
+            "finaleEpisodes": [
+              23,
+              24
+            ]
+          },
+          "firstEpisodes": [
+            {
+              "episodeNumber": 1,
+              "miniArcNumber": 1,
+              "title": "The Floating Arrival",
+              "storyPurpose": "Mila arrives at the Floating Orchard Isles and hears about the missing Gust Gems. Sparkle appears and signals the start of the quest.",
+              "conflict": "The Head Gardener announces the fourth Gust Gem is gone; Mila feels unsure about what to do.",
+              "vocabularyFocus": [
+                "kite",
+                "gem",
+                "island",
+                "festival",
+                "dragon"
+              ],
+              "expectedChoiceTheme": "help",
+              "stateChangeGoal": "Mila goes from curious newcomer to motivated helper.",
+              "illustrationOpportunity": "Mila stepping off a rope bridge onto a floating island; Sparkle lands in front of her and sneezes sparkles.",
+              "cliffhangerOrHook": "Sparkle flies toward a rope bridge and looks back as if to say 'Follow me!'"
+            },
+            {
+              "episodeNumber": 2,
+              "miniArcNumber": 1,
+              "title": "Whistling Grove Welcome",
+              "storyPurpose": "Mila and Sparkle enter the Whistling Grove and meet the Shy Squirrel, who reveals he has the first Gem but needs help.",
+              "conflict": "The squirrel hides the gem and won't give it until his winter jingleberry store is complete.",
+              "vocabularyFocus": [
+                "help",
+                "squirrel",
+                "fruit",
+                "find",
+                "friend"
+              ],
+              "expectedChoiceTheme": "help",
+              "stateChangeGoal": "Mila learns that helping others can unlock solutions.",
+              "illustrationOpportunity": "Mila and Sparkle under a tree full of jingleberries; the squirrel peeks out from a hollow.",
+              "cliffhangerOrHook": "The squirrel points to a high branch with the last jingleberries—Mila must decide how to reach them."
+            },
+            {
+              "episodeNumber": 3,
+              "miniArcNumber": 1,
+              "title": "Jingleberry Trouble",
+              "storyPurpose": "Mila attempts to gather the jingleberries for the squirrel. She must climb a small hill and work with Sparkle to shake the branch.",
+              "conflict": "The branch is too high for Mila alone; Sparkle's sparkly sneezes scare the berries off the branch.",
+              "vocabularyFocus": [
+                "help",
+                "fruit",
+                "friend",
+                "try again"
+              ],
+              "expectedChoiceTheme": "help",
+              "stateChangeGoal": "Mila succeeds with Sparkle's help and feels the satisfaction of a job done together.",
+              "illustrationOpportunity": "Sparkle sneezes a burst of sparkles that rattles the branch; berries rain into Mila’s basket.",
+              "cliffhangerOrHook": "The squirrel smiles and pulls the first Gust Gem from its nest—but a gust of wind snatches it away!"
+            }
+          ],
+          "lastEpisodes": [
+            {
+              "episodeNumber": 23,
+              "miniArcNumber": 4,
+              "title": "The Moonmelon's Grumpy Stance",
+              "storyPurpose": "Mila approaches the Giant Moonmelon, who refuses to give up his piece until she proves she can share with everyone equally.",
+              "conflict": "The Giant Moonmelon challenges Mila to share her snack with him and the children, and also credit them for helping.",
+              "vocabularyFocus": [
+                "share",
+                "snack",
+                "help"
+              ],
+              "expectedChoiceTheme": "generosity and humility",
+              "stateChangeGoal": "Mila shares the snack, then invites three children to help fit their pieces together with hers, giving them all credit.",
+              "illustrationOpportunity": "Mila breaking the last whirlyfruit into pieces with a glowing smile, surrounded by the children and the moonmelon.",
+              "cliffhangerOrHook": "The four pieces start to glow and fuse into one complete Gust Gem—the festival is saved!"
+            },
+            {
+              "episodeNumber": 24,
+              "miniArcNumber": 4,
+              "title": "The Festival Takes Flight",
+              "storyPurpose": "Mila and Sparkle return to the main island with all four gems. They place them in the central wind kite, and the kite lifts off, starting the festival.",
+              "conflict": "Mila is nervous about being in front of everyone, but the islanders cheer for her and she realizes she is no longer afraid.",
+              "vocabularyFocus": [
+                "share",
+                "festival",
+                "fly",
+                "friend",
+                "kite",
+                "gem",
+                "help",
+                "listen",
+                "brave",
+                "thank"
+              ],
+              "expectedChoiceTheme": "celebrating success and making friends",
+              "stateChangeGoal": "The kite glows, the festival begins, and Mila rides Sparkle on a kite over the islands, feeling proud.",
+              "illustrationOpportunity": "Mila and Sparkle flying on a giant glowing kite over the Floating Orchard Isles, with fireworks and music below.",
+              "cliffhangerOrHook": "The season ends with Mila smiling and the island children waving—a perfect finale."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "variant": {
+        "id": "pro_no_thinking",
+        "label": "DeepSeek V4 Pro, no thinking",
+        "model": "deepseek/deepseek-v4-pro",
+        "reasoning": {
+          "enabled": false
+        },
+        "provider": "default"
+      },
+      "steps": {
+        "framework": {
+          "latencyMs": 23509,
+          "usage": {
+            "prompt_tokens": 374,
+            "completion_tokens": 1568,
+            "total_tokens": 1942,
+            "cost": 0.0053024,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0053024,
+              "upstream_inference_prompt_cost": 0.0005984,
+              "upstream_inference_completions_cost": 0.004704
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "provider": "NextBit",
+          "repaired": false,
+          "preview": "When the wind-kites that keep the Floating Orchard Isles aloft begin to fail, Mila and her tiny dragon friend must journey across the sky-islands to find the missing Kite-Keeper and restore the winds before the islands drift apart forever."
+        },
+        "bible": {
+          "latencyMs": 26577,
+          "usage": {
+            "prompt_tokens": 1147,
+            "completion_tokens": 1454,
+            "total_tokens": 2601,
+            "cost": 0.0030838275,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0030838275,
+              "upstream_inference_prompt_cost": 0.0008722935,
+              "upstream_inference_completions_cost": 0.002211534
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "provider": "Baidu",
+          "repaired": false,
+          "preview": "The Floating Orchard Isles are a cluster of sky-islands held aloft by magical wind-kites. Each island is home to a different fruit-tree community, connected by gently swaying rope bridges. The winds are tended by the Kite-Keeper, and the islands drift together in a cozy, sun-warmed cluster. It's a world of soft breezes, friendly creatures, and the sweet smell of ripening fruit."
+        },
+        "outline": {
+          "latencyMs": 177945,
+          "episodeCount": 24,
+          "batches": [
+            {
+              "range": "1-12",
+              "latencyMs": 42060,
+              "repaired": false,
+              "count": 12
+            },
+            {
+              "range": "13-24",
+              "latencyMs": 133606,
+              "repaired": false,
+              "count": 12
+            }
+          ],
+          "preview": "Mila's solo quest to fix the wind-kites transforms into a shared journey of listening and inclusion, revealing the true problem is not broken kites but a lonely breeze-spirit needing a friend."
+        }
+      },
+      "scores": {
+        "framework": {
+          "score": 8,
+          "max": 8,
+          "issues": []
+        },
+        "bible": {
+          "score": 7,
+          "max": 7,
+          "issues": []
+        },
+        "outline": {
+          "score": 8,
+          "max": 8,
+          "issues": []
+        },
+        "total": {
+          "score": 23,
+          "max": 23
+        }
+      },
+      "totalLatencyMs": 228031,
+      "totalTokens": 15874,
+      "error": null,
+      "success": true,
+      "artifacts": {
+        "framework": {
+          "seasonPremise": "When the wind-kites that keep the Floating Orchard Isles aloft begin to fail, Mila and her tiny dragon friend must journey across the sky-islands to find the missing Kite-Keeper and restore the winds before the islands drift apart forever.",
+          "centralProblem": "The magical wind-kites that hold the Floating Orchard Isles together are losing their power, causing the islands to drift away from each other and threatening to break the bridges that connect the fruit-tree communities.",
+          "dramaticQuestion": "Can Mila find the courage to ask for help and truly listen to new friends before the islands drift too far apart?",
+          "externalStakes": "If the wind-kites fail completely, the rope bridges will snap, the fruit trees will stop bearing fruit, and the island families will be separated with no way to reach one another.",
+          "emotionalStakes": "Mila fears that asking for help means she isn't brave enough on her own, and she worries that sharing her worries might burden others.",
+          "heroWant": "Mila wants to fix the wind-kites all by herself to prove she is brave and capable.",
+          "heroNeed": "Mila needs to learn that true courage means knowing when to ask for help, listening to others' wisdom, and sharing both the journey and the joy.",
+          "antagonisticForce": "A mischievous but lonely breeze-spirit named Whiffle who has been hoarding the kite-strings because no one ever invited him to play. He isn't evil, just misunderstood and isolated.",
+          "rulesOfWorld": "1. Every island has a special fruit tree whose blossoms whisper when someone truly listens. 2. Tiny friendly dragons called Pufflets help tend the orchards and can glide short distances but need wind to fly far. 3. Rope bridges only hold when crossed with a friend. 4. Wind-kites are enchanted and respond to songs of courage and shared laughter. 5. No one can travel between islands alone.",
+          "incitingIncident": "While Mila and her Pufflet dragon friend Pip are picking star-apples on their home island, the wind-kite above them suddenly sputters and goes quiet. The rope bridge to the next island begins to sag, and a message-flower from the Kite-Keeper arrives with only half a note reading 'The strings are...' before the petals scatter.",
+          "pointOfNoReturn": "Mila watches the last rope bridge to her home island begin to snap and realizes she must leap to the next island with Pip immediately, leaving behind her comfort zone and accepting that she cannot return until the kites are fixed.",
+          "miniArcPlan": [
+            {
+              "arcNumber": 1,
+              "episodesRange": "Episodes 1-6",
+              "localGoal": "Find the Kite-Keeper's workshop on the nearest island and learn how wind-kites are made.",
+              "mainObstacle": "The bridges require two to cross, but the first island's guardian, an old tortoise named Tallow, insists on a riddle of sharing before allowing passage.",
+              "storyFunction": "Introduce the world rules, establish Mila's reluctance to ask for help, and show that Pip the dragon is a helpful but not all-powerful companion. Mila must share her snack to cross the bridge."
+            },
+            {
+              "arcNumber": 2,
+              "episodesRange": "Episodes 7-14",
+              "localGoal": "Gather three special kite-threads from three different islands, each guarded by a friend who needs something.",
+              "mainObstacle": "Each guardian needs Mila to listen to their story before they will part with the thread. The first is a busy bee who needs someone to hear her worries, the second is a shy singing bird who needs an audience, the third is a forgetful squirrel who needs Mila to remember what he shared.",
+              "storyFunction": "Deepen the 'listen' and 'share' vocabulary through repetition and emotional connection. Show Mila slowly learning that stopping to help others actually helps her quest."
+            },
+            {
+              "arcNumber": 3,
+              "episodesRange": "Episodes 15-20",
+              "localGoal": "Confront Whiffle the breeze-spirit and convince him to return the stolen kite-strings.",
+              "mainObstacle": "Whiffle is invisible and only appears when someone laughs with genuine joy. Mila is too worried to laugh, and Pip's dragon giggles aren't enough.",
+              "storyFunction": "Force Mila to confront her emotional stake — she must share her fears with Pip and allow herself to be silly and joyful even in hard times. Introduce the idea that the 'villain' is just a lonely friend."
+            }
+          ],
+          "midpointReversal": "Mila discovers that the Kite-Keeper's note wasn't a cry for help but an invitation to a festival — the kites were never broken, they were just lonely because Whiffle took the strings to make himself a swing. Mila realizes the problem isn't about fixing things, it's about making a friend feel included.",
+          "lowPoint": "Mila tries to call Whiffle alone without laughing or sharing her plan with her new friends, and her serious face makes the wind-kites droop even more. Pip gently tells her 'Maybe brave means letting me help?' and Mila finally cries, admitting she doesn't know how to make a breeze-spirit laugh.",
+          "finalChallenge": "Mila must gather all the friends she has made across the islands and together create a moment of shared, joyful laughter loud enough to reach Whiffle's hiding place in the highest cloud.",
+          "resolution": "With Pip, Tallow the tortoise, the bee, the bird, the squirrel, and even some shy Pufflets, Mila leads a silly, giggling parade that makes Whiffle curious. When he peeks out, Mila invites him to play. Whiffle returns the strings, the kites soar, and the islands drift gently back together, closer than before.",
+          "characterChange": "Mila transforms from a child who thought bravery meant silent, solo strength into a child who understands that the bravest thing is saying 'I need help' and 'Let's share this.' She becomes a listener and a friend who brings others together.",
+          "safetyBoundaries": "Dragons are always small, friendly, and slightly clumsy helpers. Whiffle is never scary, just a bit sad and invisible. No island ever falls or crashes. The stakes are emotional and community-based, never life-threatening. No one is ever truly alone or abandoned.",
+          "toneGuide": "Warm as sun through apple blossoms, adventurous but never frantic, gently funny with dragon hiccups and tortoise naps. Every episode ends with a small, safe moment of connection. Use soft, cozy language even when the bridges sag.",
+          "recurringMotifs": [
+            "Rope bridges that glow when two cross together",
+            "Pip's tiny hiccups that puff sparkles when he is nervous",
+            "Wind-kites shaped like different fruits singing soft hums",
+            "Message-flowers that bloom when someone truly listens",
+            "Whiffle's lonely little breeze sounds that sound like a half-finished song",
+            "The phrase 'Brave means together' whispered by the blossom trees"
+          ]
+        },
+        "bible": {
+          "worldOverview": "The Floating Orchard Isles are a cluster of sky-islands held aloft by magical wind-kites. Each island is home to a different fruit-tree community, connected by gently swaying rope bridges. The winds are tended by the Kite-Keeper, and the islands drift together in a cozy, sun-warmed cluster. It's a world of soft breezes, friendly creatures, and the sweet smell of ripening fruit.",
+          "worldRules": [
+            "Wind-kites must be kept happy and strung with friendship-threads to work.",
+            "Rope bridges between islands require two to cross safely — a rule of sharing.",
+            "Message-flowers carry spoken words, but only whole messages reach their destination.",
+            "Breeze-spirits like Whiffle are invisible and only appear when someone laughs with genuine, shared joy.",
+            "Pufflet dragons can puff tiny clouds and hiccup sparks, but cannot fly or fix things alone.",
+            "Every guardian on an island has a story or a need that must be acknowledged before help is given."
+          ],
+          "mainLocations": [
+            {
+              "name": "Star-Apple Island (Home Island)",
+              "description": "Mila's cozy home island, full of star-apple trees and soft grass. The central wind-kite is shaped like a giant apple blossom."
+            },
+            {
+              "name": "Tallow's Bridge Island",
+              "description": "The nearest island, guarded by Tallow the old tortoise. It has a small, mossy workshop where the Kite-Keeper once made strings. The bridge here requires a sharing riddle."
+            },
+            {
+              "name": "Busy Bee's Hive Island",
+              "description": "A golden, humming island with honeycomb cliffs. The bee guardian is always working and needs someone to listen to her worries."
+            },
+            {
+              "name": "Songbird's Perch Island",
+              "description": "A tall, windy island with a single silver tree. A shy singing bird lives here who needs an audience before she will share her kite-thread."
+            },
+            {
+              "name": "Squirrel's Acorn Island",
+              "description": "A nutty, criss-crossed island full of hiding spots. A forgetful squirrel guards the third thread and needs Mila to remember what he shared."
+            },
+            {
+              "name": "Whiffle's Cloud",
+              "description": "The highest cloud in the sky, soft and quiet, where Whiffle the breeze-spirit hides. Only genuine, shared laughter can reach it."
+            }
+          ],
+          "mainCharacters": [
+            {
+              "name": "Mila",
+              "role": "Hero",
+              "description": "A 7-year-old girl who wants to be brave and fix things by herself. She carries a little satchel and has a determined but sometimes worried face. She is learning that true courage means asking for help and listening to friends.",
+              "speechPattern": "Simple, clear sentences with occasional 'I can do it myself!' moments. Uses English at A1 level, often repeating new words."
+            },
+            {
+              "name": "Pip",
+              "role": "Companion",
+              "description": "Mila's tiny Pufflet dragon friend. He puffs small clouds, hiccups sparks, and is endlessly loyal. He is helpful but not all-powerful, and often gently nudges Mila to share her feelings.",
+              "speechPattern": "Short, encouraging phrases like 'We can try!' or 'Brave means together?' Makes soft 'puff' and 'hic' sounds."
+            },
+            {
+              "name": "Tallow",
+              "role": "First Guardian",
+              "description": "An old, wise tortoise who guards the first bridge. He speaks slowly and loves riddles about sharing. He insists on a sharing riddle before allowing passage.",
+              "speechPattern": "Slow, thoughtful. Uses words like 'share', 'together', 'friend' with long pauses."
+            },
+            {
+              "name": "Whiffle",
+              "role": "Breeze-Spirit / Lonely Friend",
+              "description": "An invisible breeze-spirit who took the kite-strings to make himself a swing because he was lonely. He only appears when someone laughs with genuine joy. Not a villain, just a friend who felt left out.",
+              "speechPattern": "Whiffle makes soft 'whoosh' and giggle sounds. When he finally speaks, he says simple things like 'Play with me?'"
+            }
+          ],
+          "seasonContinuityRules": [
+            "Each episode ends with a small, safe moment of connection — a shared snack, a laugh, a held hand.",
+            "New vocabulary from previous episodes must reappear naturally in the next two episodes.",
+            "Mila's emotional state carries forward: if she learned to share in Episode 3, she must practice it again in Episode 5.",
+            "Pip always reminds Mila of what they learned before, using the same core words.",
+            "The bridges cannot be crossed alone — every crossing must involve a moment of asking for help or sharing.",
+            "Message-flowers or wind-kite behavior visually reflect the emotional tone of the story."
+          ],
+          "vocabularyPlan": {
+            "coreWords": [
+              "help",
+              "share",
+              "friend",
+              "listen",
+              "brave",
+              "together",
+              "laugh",
+              "kite",
+              "bridge",
+              "wind",
+              "island",
+              "fruit",
+              "dragon",
+              "tortoise",
+              "bee",
+              "bird",
+              "squirrel",
+              "cloud",
+              "swing",
+              "happy"
+            ],
+            "actionPhrases": [
+              "Can you help me?",
+              "Let's share.",
+              "I can listen.",
+              "We are friends.",
+              "Be brave!",
+              "Let's do it together.",
+              "I hear you.",
+              "Come and play!",
+              "The kite is flying!",
+              "Cross the bridge."
+            ],
+            "reviewCadence": "Every third episode includes a structured review segment where previously learned core words and phrases are used in a new context. Pip often initiates this by saying 'Remember when we learned...?'"
+          },
+          "rewardLogic": {
+            "type": "Emotional Connection & Friendship Tokens",
+            "description": "Learners earn a 'friendship-thread' (virtual token) each time they successfully use a core word or phrase in the interactive story. Collecting threads helps Mila and Pip weave a new kite-tail. After every 5 threads, a wind-kite glows brighter and a new island drifts closer, visually reinforcing progress. The final reward is a shared giggle parade with Whiffle, unlocking a celebratory animation."
+          }
+        },
+        "outline": {
+          "episodeCount": 24,
+          "continuityCheck": {
+            "centralProblemProgression": "Mila's solo quest to fix the wind-kites transforms into a shared journey of listening and inclusion, revealing the true problem is not broken kites but a lonely breeze-spirit needing a friend.",
+            "midpointEpisode": 12,
+            "lowPointEpisode": 20,
+            "finaleEpisodes": [
+              23,
+              24
+            ]
+          },
+          "firstEpisodes": [
+            {
+              "episodeNumber": 1,
+              "miniArcNumber": 1,
+              "title": "The Quiet Kite",
+              "storyPurpose": "Introduce the world, the problem, and Mila's desire to fix things alone.",
+              "conflict": "The wind-kite above Mila's island sputters and goes quiet, making the bridge sag. Mila wants to fix it herself but doesn't know how.",
+              "vocabularyFocus": [
+                "kite",
+                "wind",
+                "help",
+                "brave"
+              ],
+              "expectedChoiceTheme": "Should Mila let Pip help her investigate the kite?",
+              "stateChangeGoal": "Mila and Pip decide to find the Kite-Keeper, but Mila insists on leading.",
+              "illustrationOpportunity": "Mila and Pip under the drooping kite, star-apples in hand, the sagging rope bridge in the background.",
+              "cliffhangerOrHook": "A message-flower arrives with half a note: 'The strings are...' before the petals scatter."
+            },
+            {
+              "episodeNumber": 2,
+              "miniArcNumber": 1,
+              "title": "The Half-Note",
+              "storyPurpose": "Establish the quest and Mila's reluctance to ask for help.",
+              "conflict": "Mila tries to piece together the scattered message-flower petals alone, but Pip sees she needs help reading them.",
+              "vocabularyFocus": [
+                "friend",
+                "listen",
+                "share",
+                "together"
+              ],
+              "expectedChoiceTheme": "Should Mila let Pip help her gather and read the petals?",
+              "stateChangeGoal": "Mila and Pip learn the Kite-Keeper is on the next island and they must cross the bridge.",
+              "illustrationOpportunity": "Mila and Pip chasing floating flower petals across the orchard, Pip puffing to catch them.",
+              "cliffhangerOrHook": "The bridge creaks and a slow voice says, 'To cross, you must first share...'"
+            },
+            {
+              "episodeNumber": 3,
+              "miniArcNumber": 1,
+              "title": "Tallow's Riddle",
+              "storyPurpose": "Introduce the first guardian and the rule that bridges need two to cross safely.",
+              "conflict": "Tallow the tortoise blocks the bridge with a riddle about sharing. Mila tries to solve it alone but can't.",
+              "vocabularyFocus": [
+                "bridge",
+                "tortoise",
+                "share",
+                "friend"
+              ],
+              "expectedChoiceTheme": "What should Mila share with Tallow to show she understands?",
+              "stateChangeGoal": "Mila shares her snack with Pip and Tallow, and Tallow lets them pass.",
+              "illustrationOpportunity": "Tallow on the bridge, Mila holding out her snack, Pip looking hopeful.",
+              "cliffhangerOrHook": "The bridge steadies as they cross, but the next island looks different."
+            }
+          ],
+          "lastEpisodes": [
+            {
+              "episodeNumber": 23,
+              "miniArcNumber": 3,
+              "title": "Strings in the Breeze",
+              "storyPurpose": "Resolve the quest: Whiffle returns the strings and the kites are restored. Show Mila inviting Whiffle to stay as a friend.",
+              "conflict": "Whiffle appears—a shimmering, giggling breeze-form—and offers the strings back shyly. Mila must choose between just taking them or inviting Whiffle to join her island's playtime.",
+              "vocabularyFocus": [
+                "friend",
+                "play",
+                "together"
+              ],
+              "expectedChoiceTheme": "Take strings and go vs. invite a new friend.",
+              "stateChangeGoal": "Mila invites Whiffle to come play with everyone on her island, completing her arc from 'fix it alone' to 'share the joy'.",
+              "illustrationOpportunity": "Whiffle visible as a little swirling breeze with a shy smile, holding out the glowing strings to a gently smiling Mila, all friends gathered around.",
+              "cliffhangerOrHook": "The kites catch the wind. Islands hum and drift back together. The bridges tighten, stronger than before."
+            },
+            {
+              "episodeNumber": 24,
+              "miniArcNumber": 3,
+              "title": "Orchard Together",
+              "storyPurpose": "Provide the season's cozy resolution, model sustained friendship, and plant a seed for future adventures.",
+              "conflict": "No external conflict; internal reflection. Mila must consciously choose to keep sharing, listening, and playing with all her friends, including Whiffle, instead of going back to 'I can do it myself.'",
+              "vocabularyFocus": [
+                "together",
+                "brave",
+                "happy"
+              ],
+              "expectedChoiceTheme": "Play alone vs. play with everyone.",
+              "stateChangeGoal": "Mila cheerfully invites everyone to a star-apple picnic on her home island, showing she has internalized the season's lesson. Pip calls her 'the bravest sharer.'",
+              "illustrationOpportunity": "A sunny island picnic: Tallow napping under a tree, Whiffle swinging on a tiny kite-string hammock, Pip eating star-apple, Mila laughing in the middle, islands close and cozy.",
+              "cliffhangerOrHook": "A new message-flower blooms: 'Thank you for the laughter.' Signed with a doodle of a swing and a heart."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "variant": {
+        "id": "pro_medium_thinking",
+        "label": "DeepSeek V4 Pro, thinking medium",
+        "model": "deepseek/deepseek-v4-pro",
+        "reasoning": {
+          "effort": "medium"
+        },
+        "provider": "default"
+      },
+      "steps": {
+        "framework": {
+          "latencyMs": 75781,
+          "usage": {
+            "prompt_tokens": 375,
+            "completion_tokens": 3916,
+            "total_tokens": 4291,
+            "cost": 0.0062414235,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0062414235,
+              "upstream_inference_prompt_cost": 0.0002851875,
+              "upstream_inference_completions_cost": 0.005956236
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2255,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "provider": "Baidu",
+          "repaired": false,
+          "preview": "When the wind that holds together the Floating Orchard Isles mysteriously vanishes, a brave girl named Mila and her giggly dragon friend Breeze must journey across drifting islands, learn to truly listen and share, and befriend a lonely cloud to bring back the wind and save their home."
+        },
+        "bible": {
+          "latencyMs": 73761,
+          "usage": {
+            "prompt_tokens": 1272,
+            "completion_tokens": 5352,
+            "total_tokens": 6624,
+            "cost": 0.017748032,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 1024,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.017748032,
+              "upstream_inference_prompt_cost": 0.000536,
+              "upstream_inference_completions_cost": 0.017212032
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3704,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "provider": "Alibaba",
+          "repaired": false,
+          "preview": "The Floating Orchard Isles are a chain of islands that drift high above a sparkling sea, each island a different fruit orchard. Rope bridges and giant kites connect them, all powered by a magical, friendly wind. The wind carries songs, giggles, and the smell of ripe fruit. When the wind vanishes, the islands begin to drift apart. The story follows Mila and her dragon Breeze as they journey to bring back the wind by learning to listen, share, and ask for help. The world is warm, never too scary, and full of funny neighbours and gentle surprises."
+        },
+        "outline": {
+          "latencyMs": 198057,
+          "episodeCount": 24,
+          "batches": [
+            {
+              "range": "1-12",
+              "latencyMs": 90029,
+              "repaired": false,
+              "count": 12
+            },
+            {
+              "range": "13-24",
+              "latencyMs": 47457,
+              "repaired": false,
+              "count": 12
+            }
+          ],
+          "preview": "The magical wind vanishes, causing islands to drift apart. Mila sets out alone to restore it but must learn to listen and share. After a failed confrontation with Gusty and a falling-out with Breeze, she finally understands true courage, reconciles, and through friendship and listening, brings back the wind."
+        }
+      },
+      "scores": {
+        "framework": {
+          "score": 8,
+          "max": 8,
+          "issues": []
+        },
+        "bible": {
+          "score": 7,
+          "max": 7,
+          "issues": []
+        },
+        "outline": {
+          "score": 8,
+          "max": 8,
+          "issues": []
+        },
+        "total": {
+          "score": 23,
+          "max": 23
+        }
+      },
+      "totalLatencyMs": 347599,
+      "totalTokens": 27780,
+      "error": null,
+      "success": true,
+      "artifacts": {
+        "framework": {
+          "seasonPremise": "When the wind that holds together the Floating Orchard Isles mysteriously vanishes, a brave girl named Mila and her giggly dragon friend Breeze must journey across drifting islands, learn to truly listen and share, and befriend a lonely cloud to bring back the wind and save their home.",
+          "centralProblem": "The magical wind that powers the rope bridges and kite sails has disappeared, causing the islands to drift apart and threatening to separate families forever.",
+          "dramaticQuestion": "Can Mila learn to listen, ask for help, and share her bravery with others in time to restore the wind and reunite the islands?",
+          "externalStakes": "If the wind doesn't return, the islands will drift too far apart, bridges will snap, and the starfruit island with Mila's little brother on it will float beyond the edge of the world.",
+          "emotionalStakes": "Mila fears losing her home and her newfound friendship with Breeze, but deeper down she worries that relying on others means she isn't truly brave.",
+          "heroWant": "Mila wants to be the hero who single-handedly brings back the wind and proves she is the bravest kid on the Floating Orchard Isles.",
+          "heroNeed": "She needs to understand that real courage means listening to others, asking for help, and sharing the adventure (and the credit) with friends.",
+          "antagonisticForce": "A lonely wind-cloud named Gusty, who stopped the wind because no one ever listened to its songs or shared their stories with it. Gusty is not evil—just deeply sad, shy, and misunderstood.",
+          "rulesOfWorld": "The Floating Orchard Isles are tiny sky-islands covered in magical fruit trees, connected by rope bridges and held in place by wind-filled kites. Friendly little wind dragons like Breeze can puff gentle breezes and love hiccuping when nervous. The great winds are controlled by ancient cloud beings who thrive on friendship and stories. Every fruit tastes extra sweet when shared.",
+          "incitingIncident": "During the annual Kite Festival, as Mila is about to launch her rainbow kite with her best friend, all wind suddenly stops. Kites plummet, bridges sag, and one small island—the rare starfruit island where Mila's little brother is playing—starts to drift away. Mila's brother waves in panic, and no one can reach him.",
+          "pointOfNoReturn": "Mila and Breeze cross a dangerously loose, creaking bridge to Driftwood Island, the last outpost before the silent Windless Expanse. The bridge unravels behind them; they cannot go back until they find the source of the wind-stealing.",
+          "miniArcPlan": [
+            {
+              "arcNumber": 1,
+              "episodesRange": "1-7",
+              "localGoal": "Discover what is stealing the wind.",
+              "mainObstacle": "Mila tries to solve everything alone and ignores Breeze's suggestions. They get lost in the Whistling Tunnels because Mila won't listen to Breeze's keen dragon ears.",
+              "storyFunction": "Introduce the world, the stakes, and Mila's flaw of stubborn independence. Establish the quest and the growing but bumpy friendship with Breeze."
+            },
+            {
+              "arcNumber": 2,
+              "episodesRange": "8-15",
+              "localGoal": "Find Gusty the cloud and convince it to release the wind.",
+              "mainObstacle": "Gusty refuses to speak and hides. Mila insists on a bold, loud demand, which backfires. Along the way, they must help three island communities with problems that teach 'help', 'share', and 'listen'—each giving a clue about Gusty's loneliness.",
+              "storyFunction": "Deepen the theme, build the friendship with Breeze through shared adventures, and show Mila slowly learning to listen. Midpoint reversal occurs when Mila's approach utterly fails."
+            },
+            {
+              "arcNumber": 3,
+              "episodesRange": "16-26",
+              "localGoal": "Mend Gusty's loneliness by truly listening and sharing stories, then restore the wind and save the drifting islands.",
+              "mainObstacle": "Mila and Breeze have a falling-out when Mila takes all the credit for finding the cloud palace; Breeze flies off, hurt. Gusty grows angrier. Mila must realize her mistake, genuinely apologize, and together with Breeze offer Gusty friendship through listening and the funny tale of the Great Fruit Pie Disaster.",
+              "storyFunction": "Lead to the emotional low point, then the climax and resolution. Complete Mila's change from a 'me-first' hero to a friend who shares courage."
+            }
+          ],
+          "midpointReversal": "Mila and Breeze finally reach the cloud palace and Mila shouts for Gusty to return the wind right now. Instead of a battle, Gusty bursts into rain-tears and wails, 'Nobody ever listens to me, so I stopped the wind! I don't care about your islands!' A powerful gust blows them all the way to the Slumbering Orchards, where giggle-fruit almost puts them to sleep. Mila realises her bold approach was all wrong.",
+          "lowPoint": "Soon after, Mila boasts to some islanders that she alone found the cloud palace. Breeze, feeling unappreciated and sad, says quietly, 'A real friend shares adventures and listens,' then flies away. Alone, Mila looks out and sees the starfruit island with her little brother drifting dangerously close to the world's rim. She understands she cannot fix this by herself.",
+          "finalChallenge": "Mila must find Breeze, truly apologize, and listen to his feelings. Together, they return to Gusty. Instead of demands, they sit down, listen to Gusty's songs for the first time, and share the hilarious story of the Great Fruit Pie Disaster. Mila then invites Gusty to the Kite Festival. Gusty laughs for the first time in centuries, and the wind begins to stir again.",
+          "resolution": "The wind returns softly, then strong, pulling the islands gently back into place. Rope bridges tighten, kites fill the sky. Gusty joins the festival as the guest of honour, making wind-rainbows for everyone. Mila and Breeze fly the biggest two-person kite together, and Mila tells the crowd, 'Breeze is the real hero—he taught me to listen.' The islands celebrate with a grand feast where every fruit is shared.",
+          "characterChange": "Mila transforms from a headstrong child who thought 'I can do it all by myself' into a truly brave girl who knows that courage means listening to friends, asking for help, and sharing adventures—and the spotlight—with those she loves.",
+          "safetyBoundaries": "All dragons are friendly helpers; Breeze is clumsy, giggly, and hiccups tiny whirlwinds. Gusty is a sad, lonely cloud—never monstrous or scary. Peril (a wobbly bridge, getting stuck) is brief and light-hearted, resolved with help or humour. The Windless Expanse is simply quiet and a little lonely. The tone stays warm with fruit puns, a pirate parrot who collects socks, and silly mango-bird songs.",
+          "toneGuide": "Warm, adventurous, and gently funny, like a hug wrapped in kite string. Language is simple and cheerful. Excitement never feels scary. Mila's mistakes bring gentle laughs and heartfelt lessons. Breeze hiccups tiny rainbow puffs when nervous. The islands are full of quirky neighbours—a grumpy lemon farmer who secretly knits, three-part-harmony mango birds. Humour comes from misunderstandings, dragon hiccups, and the joy of unexpected friendship."
+        },
+        "bible": {
+          "worldOverview": "The Floating Orchard Isles are a chain of islands that drift high above a sparkling sea, each island a different fruit orchard. Rope bridges and giant kites connect them, all powered by a magical, friendly wind. The wind carries songs, giggles, and the smell of ripe fruit. When the wind vanishes, the islands begin to drift apart. The story follows Mila and her dragon Breeze as they journey to bring back the wind by learning to listen, share, and ask for help. The world is warm, never too scary, and full of funny neighbours and gentle surprises.",
+          "worldRules": [
+            "The floating islands stay together thanks to the magical wind, which blows through special wind-kites and rope bridges.",
+            "The wind has a personality—it is made and controlled by a lonely cloud creature named Gusty.",
+            "Dragons on the isles come in small sizes and have unique magical quirks, like Breeze's nervous rainbow hiccups.",
+            "Each island grows one main type of magical fruit, which has a mild, silly effect if eaten (like giggling or temporary colour changes).",
+            "People travel between islands using kite-sails, rope bridges, or by riding friendly dragons.",
+            "No one can fall off the world because the rim gently bounces things back, but islands can drift too far apart to reach.",
+            "The magic of the isles responds to emotions—listening, sharing, and kind words make things grow and glow."
+          ],
+          "mainLocations": [
+            {
+              "name": "Starfruit Island",
+              "description": "A small, star-shaped island where starfruits grow. Mila's little brother was playing here when the island began to drift. It has twisty yellow trees and a small sandbox."
+            },
+            {
+              "name": "The Whistling Tunnels",
+              "description": "A maze of caves on Mango Island where the wind used to whistle tunes. Dark but full of echo sounds. Easy to get lost if you don't listen carefully."
+            },
+            {
+              "name": "Cloud Palace",
+              "description": "A fluffy, towering castle made of clouds where Gusty lives. It is beautiful but very quiet and sad when the wind is gone. The halls echo with lonely songs."
+            },
+            {
+              "name": "Slumbering Orchards",
+              "description": "A sleepy island covered in giggle-fruit trees. The smell of the fruit makes you very tired and a bit silly. You must share a funny story to wake up."
+            },
+            {
+              "name": "The World's Rim",
+              "description": "The very edge of the Floating Orchard Isles. The sky goes on forever here. Islands that drift too close can get stuck in the slow, sleepy air."
+            },
+            {
+              "name": "Kite Festival Meadow",
+              "description": "The main gathering place on the largest island, full of colourful kites. Where the story begins and ends with celebrations."
+            }
+          ],
+          "mainCharacters": [
+            {
+              "name": "Mila",
+              "age": 7,
+              "description": "A brave and determined girl with curly hair tied in a starfruit clip. She loves flying kites and wants to be the hero. Her flaw is that she tries to do everything alone and often forgets to listen. She grows to learn that sharing adventures and credit is the truest courage."
+            },
+            {
+              "name": "Breeze",
+              "description": "A small, giggly dragon with sky-blue scales and a yellow belly. He is Mila's best friend. He has excellent hearing and a big heart. He sneezes rainbow puffs when nervous. He feels hurt when Mila doesn't share or listen, and he is the key to showing Mila what friendship really means."
+            },
+            {
+              "name": "Gusty",
+              "description": "A very old, lonely cloud who controls the wind. Gusty stopped the wind because nobody ever listened to its songs. It has a booming voice but cries rain-tears. It longs for a friend and laughter. When it finally laughs, the wind returns."
+            },
+            {
+              "name": "Mila's little brother",
+              "description": "A playful toddler who loves sandboxes and starfruit. He gets stuck on the drifting Starfruit Island, giving Mila her strongest reason to restore the wind."
+            }
+          ],
+          "seasonContinuityRules": [
+            "Mila's emotional journey is serial: each episode moves her slightly from 'I do it alone' to 'we do it together'. The change is gradual across the 26 episodes.",
+            "The core friendship between Mila and Breeze is tested and strengthened across the three mini-arcs. Episodes in the same arc must show their bond building or straining consistently.",
+            "Clues about Gusty's loneliness must be woven into the island communities' problems in Arc 2. Each community teaches 'help', 'share', or 'listen'.",
+            "No island can be permanently saved until the final resolution. The central problem (no wind, islands drifting) remains a threat.",
+            "Recurring side characters (like the grumpy lemon farmer) can appear in multiple episodes for familiarity but do not overshadow the main quest.",
+            "Each episode must include a small English language learning moment tied to the vocabulary plan, often through a song, a repeated phrase, or Breeze's helpful prompts.",
+            "The tone remains consistently warm and humorous. Any scary moments (like the island drifting) are quickly softened with comic relief or a hug."
+          ],
+          "vocabularyPlan": {
+            "coreWords": [
+              "help",
+              "share",
+              "listen",
+              "friend",
+              "wind",
+              "kite",
+              "fly",
+              "apple",
+              "big",
+              "small",
+              "happy",
+              "sad",
+              "hello",
+              "bye",
+              "please",
+              "thank you"
+            ],
+            "actionPhrases": [
+              "Let's go!",
+              "I can help.",
+              "Let's share.",
+              "Listen to me.",
+              "Come with me.",
+              "Let's be friends.",
+              "I am sorry.",
+              "We did it!",
+              "It's my turn.",
+              "Your turn."
+            ],
+            "reviewCadence": "Every fifth episode includes a playful recap where Breeze asks Mila (and the reader) to remember three core words and use them in a sentence. Example: Breeze says, 'How do you say \"share\" in a story?'"
+          },
+          "rewardLogic": "After each episode, the child is invited to help Mila and Breeze by saying a key English word or phrase aloud (e.g., 'Let's share!'). The interactive story then acknowledges the child's help with a fun response: a character winks, Breeze blows a rainbow squeak, or a kite glitter-sparkles. At the end of each 7-episode arc, the child collects a 'listening star' in a virtual kite-tail. Collecting all three stars unlocks a special animated song about friendship and sharing.",
+          "illustrationStyleGuide": "Hand-painted watercolour textures with soft, glowing colours. Characters have large, expressive eyes and simple, rounded shapes. Mila has curly brown hair and always wears a yellow tunic. Breeze is chubby and sky-blue with a yellow underbelly, wings like colourful kites. Settings are lush and fruit-filled. The colour palette is warm: peaches, soft greens, sunny yellows, and sky blues. The tone is gentle, whimsical, and full of tiny, funny details (a lemon farmer knitting a scarf out of vines, mango birds singing in a tree). Never use sharp lines or dark, ominous shadows."
+        },
+        "outline": {
+          "episodeCount": 24,
+          "continuityCheck": {
+            "centralProblemProgression": "The magical wind vanishes, causing islands to drift apart. Mila sets out alone to restore it but must learn to listen and share. After a failed confrontation with Gusty and a falling-out with Breeze, she finally understands true courage, reconciles, and through friendship and listening, brings back the wind.",
+            "midpointEpisode": 12,
+            "lowPointEpisode": 20,
+            "finaleEpisodes": [
+              23,
+              24
+            ]
+          },
+          "firstEpisodes": [
+            {
+              "episodeNumber": 1,
+              "miniArcNumber": 1,
+              "title": "The Kite Festival Calm",
+              "storyPurpose": "Introduce the world, Mila's flaw, and the inciting incident; wind vanishes, brother stranded.",
+              "conflict": "Wind stops during the kite contest, starfruit island drifts with Mila's little brother, no one can reach him.",
+              "vocabularyFocus": [
+                "wind",
+                "kite",
+                "fly",
+                "help"
+              ],
+              "expectedChoiceTheme": "jumping into action vs. making a plan",
+              "stateChangeGoal": "Mila decides to be the hero and bring back the wind alone.",
+              "illustrationOpportunity": "Rainbow kites falling from the sky as Mila's brother waves from the drifting island.",
+              "cliffhangerOrHook": "Mila grabs her kite and declares she will find the wind—but Breeze insists on coming too."
+            },
+            {
+              "episodeNumber": 2,
+              "miniArcNumber": 1,
+              "title": "Breeze's Big Idea",
+              "storyPurpose": "Show Mila ignoring Breeze's suggestion, leading to a minor mishap.",
+              "conflict": "Mila chooses a risky shortcut over Breeze's safer path, and they get tangled in sticky honey-vines.",
+              "vocabularyFocus": [
+                "listen",
+                "friend",
+                "big",
+                "small"
+              ],
+              "expectedChoiceTheme": "listening vs. ignoring a friend",
+              "stateChangeGoal": "Mila frees them but still thinks she knows best.",
+              "illustrationOpportunity": "Breeze hiccuping rainbow puffs while stuck in golden honey-vines.",
+              "cliffhangerOrHook": "They spot a strange, silent orchard where the wind never blows—could it be a clue?"
+            },
+            {
+              "episodeNumber": 3,
+              "miniArcNumber": 1,
+              "title": "The Whispering Grove",
+              "storyPurpose": "Introduce the mango birds and a puzzle that requires careful listening.",
+              "conflict": "The three-part-harmony mango birds will only share their clue if Mila repeats their song, but she rushes and gets it wrong.",
+              "vocabularyFocus": [
+                "listen",
+                "please",
+                "help",
+                "happy"
+              ],
+              "expectedChoiceTheme": "patient listening vs. rushing ahead",
+              "stateChangeGoal": "Mila realizes she needs Breeze's keen ears to get the clue.",
+              "illustrationOpportunity": "Three mango birds singing in perfect harmony on a branch, Breeze tilting his head with big eyes.",
+              "cliffhangerOrHook": "Breeze learns the song, and the birds reveal a riddle about a 'lonely sky-keeper'."
+            }
+          ],
+          "lastEpisodes": [
+            {
+              "episodeNumber": 23,
+              "miniArcNumber": 3,
+              "title": "The Kite Festival Returns",
+              "storyPurpose": "Gusty is welcomed as the guest of honor, and Mila and Breeze fly together.",
+              "conflict": "Gusty feels shy at the festival; Mila and Breeze help by flying the biggest two-person kite.",
+              "vocabularyFocus": [
+                "celebrate",
+                "friend"
+              ],
+              "expectedChoiceTheme": "how to make someone feel included",
+              "stateChangeGoal": "Gusty makes wind-rainbows; Mila announces Breeze taught her to listen.",
+              "illustrationOpportunity": "The sky full of kites and rainbow wind, Gusty beaming.",
+              "cliffhangerOrHook": "The crowd cheers, and Gusty laughs again, louder than ever."
+            },
+            {
+              "episodeNumber": 24,
+              "miniArcNumber": 3,
+              "title": "A Feast of Friends",
+              "storyPurpose": "The season concludes with a grand shared feast and a playful recap of core words.",
+              "conflict": "Everyone wants to thank Gusty, but Gusty doesn't know how to receive thanks.",
+              "vocabularyFocus": [
+                "help",
+                "share",
+                "listen",
+                "friend"
+              ],
+              "expectedChoiceTheme": "sharing the last fruit with a new friend",
+              "stateChangeGoal": "Gusty accepts a starfruit; Mila and Breeze lead a recap of what they've learned.",
+              "illustrationOpportunity": "A long table on the main island, every fruit being passed, Gusty wearing a tiny fruit hat.",
+              "cliffhangerOrHook": "Breeze hiccups a giant rainbow that wraps around all the islands."
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "finishedAt": "2026-06-24T05:43:11.564Z",
+  "totalBenchmarkMs": 1499561,
+  "successCount": 4
+}
