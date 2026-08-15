@@ -147,7 +147,8 @@ export class AuthService {
 
   private cookieOptions() {
     const domain = process.env.SESSION_COOKIE_DOMAIN;
-    return { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/', ...(domain ? { domain } : {}) };
+    const sameSite: 'none' | 'lax' = process.env.SESSION_COOKIE_SAME_SITE === 'none' ? 'none' : 'lax';
+    return { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite, path: '/', ...(domain ? { domain } : {}) };
   }
 
   private allowedOrigins(): string[] {
