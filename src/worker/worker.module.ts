@@ -1,4 +1,4 @@
-import { Module, OnModuleInit } from '@nestjs/common';
+import { Module, OnApplicationBootstrap } from '@nestjs/common';
 import { SeasonsModule } from '../seasons/seasons.module';
 import { SeasonsService } from '../seasons/seasons.service';
 import { WorkerService } from './worker.service';
@@ -9,13 +9,13 @@ import { WorkerController } from './worker.controller';
   providers: [WorkerService],
   controllers: [WorkerController],
 })
-export class WorkerModule implements OnModuleInit {
+export class WorkerModule implements OnApplicationBootstrap {
   constructor(
     private readonly workerService: WorkerService,
     private readonly seasonsService: SeasonsService,
   ) {}
 
-  async onModuleInit() {
+  async onApplicationBootstrap() {
     if (process.env.WORKER_ENABLED !== 'false') {
       const recovered = await this.seasonsService.recoverOrphanedJobsOnStartup();
       if (recovered > 0) {
