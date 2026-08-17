@@ -5331,9 +5331,9 @@ Rules:
 - Avoid copyrighted characters, famous franchises, scary details, medical themes, politics, and violence.
 - preferredName must use English letters only (Latin alphabet, optional space or hyphen, no Cyrillic).
 - gender must be exactly one of: "boy", "girl", "ai_decides".
-- The parent-facing hero description must be in Russian.
+- Every parent-facing text field must be in Russian: heroType, companion, favoriteColor, accessory, appearanceRu, and descriptionRu. The only exception is preferredName, which must be Latin-only.
 - Traits must be simple adjectives or short adjective phrases.
-- Companion should be a short creature or helper concept, not a full sentence.
+- Companion should be a short Russian creature or helper concept, not a full sentence.
 - Favorite color must be a simple color phrase.
 - Accessory must be a visible recurring object for illustrations.`;
 
@@ -5359,16 +5359,17 @@ If it contains gender, age, traits, or description, the resulting descriptionRu 
 When the parent confirms gender and age, set gender to that exact value and start descriptionRu with this exact identity: "<preferredName> — <age>-летний мальчик" for boy or "<preferredName> — <age>-летняя девочка" for girl. Do not use a gendered alternative such as "ученица" or "исследовательница" in place of this identity.
 If Parent-confirmed hero direction contains a non-empty companion, preserve that companion. Otherwise generate a fresh, specific companion concept that fits the current world, the hero's age, gender, and traits; do not reuse a generic companion from an earlier profile.
 If the parent supplied a Russian description, improve its clarity only while preserving all confirmed details. Include visible appearance, clothing or a signature object, a concrete personality-in-action detail, and the companion in the final descriptionRu. Do not merely list the form settings.
+descriptionRu must be a detailed Russian paragraph of 260-520 characters. It must be useful as an editable parent-facing template, not a short summary.
 
 Return JSON:
 {
   "preferredName": "English hero name suggestion in Latin letters only",
   "gender": "boy, girl, or ai_decides",
-  "heroType": "short archetype like young map-maker or moonlight mechanic",
+  "heroType": "short Russian archetype",
   "traits": ["trait one", "trait two", "trait three"],
-  "companion": "short companion concept",
-  "favoriteColor": "simple color",
-  "accessory": "short visible accessory",
+  "companion": "short Russian companion concept",
+  "favoriteColor": "simple Russian color",
+  "accessory": "short Russian visible accessory",
   "appearanceRu": "2-3 short Russian sentences about visible appearance, clothes, colors, signature object",
   "descriptionRu": "short Russian paragraph for the parent: who the hero is, what kind of personality they have, what they look like, and what companion idea fits them"
 }`;
@@ -5471,7 +5472,7 @@ Return JSON:
 
     if (!englishName.test(preferredName)) errors.push('preferredName is not English-only');
     if (requestedName && preferredName !== requestedName) errors.push('preferredName conflicts with the parent-confirmed name');
-    if (description.length < 320 || !containsCyrillic(description)) errors.push('descriptionRu is missing or not detailed Russian text');
+    if (description.length < 260 || !containsCyrillic(description)) errors.push('descriptionRu is missing or not detailed Russian text');
     if (String(draft.companion || '').length < 8 || !containsCyrillic(String(draft.companion || ''))) errors.push('companion is missing or not Russian text');
     if (String(draft.appearanceRu || '').length < 80 || !containsCyrillic(String(draft.appearanceRu || ''))) errors.push('appearanceRu is missing or not Russian text');
 
