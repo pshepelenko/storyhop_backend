@@ -138,6 +138,98 @@ export class DemoStoryService {
     return { status: 'ready', results };
   }
 
+  /**
+   * Attaches the reviewed demo assets that already exist in R2. It never calls
+   * an AI provider and verifies every object before changing the database.
+   */
+  async importMediaSnapshot() {
+    await this.ensureTextSeed();
+    const story = await this.demoStories.findOne({ where: { slug: DEMO_STORY_SLUG } });
+    if (!story) {
+      throw new Error('Demo story text seed failed');
+    }
+    const nodes = await this.demoNodes.find({
+      where: { demoStoryId: story.demoStoryId },
+      order: { episodeNumber: 'ASC', nodeKey: 'ASC' },
+    });
+
+    const snapshot = nodes.map((node) => {
+      const baseKey = `demo-story/${story.slug}/${DEMO_MEDIA_VERSION}`;
+      const audioChunks = [
+        {
+          id: 'chapter',
+          type: 'chapter',
+          choiceId: null,
+          text: node.chapterText,
+          status: 'ready',
+          audioKey: `${baseKey}/audio/${node.nodeKey}-chapter.mp3`,
+        },
+        ...(node.introOptionsPhrase
+          ? [{
+              id: 'intro',
+              type: 'intro',
+              choiceId: null,
+              text: node.introOptionsPhrase,
+              status: 'ready',
+              audioKey: `${baseKey}/audio/${node.nodeKey}-intro.mp3`,
+            }]
+          : []),
+        ...node.choices.map((choice: any) => ({
+          id: `choice-${choice.id}`,
+          type: 'choice',
+          choiceId: choice.id,
+          text: choice.text,
+          status: 'ready',
+          audioKey: `${baseKey}/audio/${node.nodeKey}-choice-${choice.id}.mp3`,
+        })),
+      ];
+      return {
+        node,
+        imageKey: `${baseKey}/images/${node.nodeKey}.png`,
+        audioChunks,
+      };
+    });
+
+    const requiredKeys = snapshot.flatMap(({ imageKey, audioChunks }) => [
+      imageKey,
+      ...audioChunks.map((chunk) => chunk.audioKey),
+    ]);
+    const presence = await Promise.all(requiredKeys.map(async (key) => [key, await this.storage.exists(key)] as const));
+    const missing = presence.filter(([, present]) => !present).map(([key]) => key);
+    if (missing.length) {
+      throw new Error(`Demo media snapshot is incomplete in R2: ${missing.join(', ')}`);
+    }
+
+    await this.demoNodes.manager.transaction(async (manager) => {
+      for (const { node, imageKey, audioChunks } of snapshot) {
+        await manager.update(
+          DemoStoryNode,
+          { nodeId: node.nodeId },
+          {
+            imageUrl: this.storage.getProxyUrl(imageKey),
+            audioChunks: audioChunks.map(({ audioKey, ...chunk }) => ({
+              ...chunk,
+              audioUrl: this.storage.getProxyUrl(audioKey),
+            })) as any,
+            updatedAt: new Date(),
+          },
+        );
+      }
+      await manager.update(
+        DemoStory,
+        { demoStoryId: story.demoStoryId },
+        { status: 'ready', updatedAt: new Date() },
+      );
+    });
+
+    return {
+      status: 'ready',
+      importedNodes: snapshot.length,
+      importedImages: snapshot.length,
+      importedAudioChunks: requiredKeys.length - snapshot.length,
+    };
+  }
+
   private async ensureTextSeed(force = false) {
     const existing = await this.demoStories.findOne({ where: { slug: DEMO_STORY_SLUG } });
     if (existing && !force) {

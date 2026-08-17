@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 @Injectable()
 export class StorageService {
@@ -76,6 +76,24 @@ export class StorageService {
       body: Buffer.concat(chunks),
       contentType: result.ContentType || 'application/octet-stream',
     };
+  }
+
+  async exists(key: string): Promise<boolean> {
+    try {
+      await this.getClient().send(
+        new HeadObjectCommand({
+          Bucket: this.getBucket(),
+          Key: key,
+        }),
+      );
+      return true;
+    } catch (error: any) {
+      const status = error?.$metadata?.httpStatusCode;
+      if (status === 404 || error?.name === 'NotFound') {
+        return false;
+      }
+      throw error;
+    }
   }
 
   async upload(key: string, body: Buffer, contentType: string): Promise<string> {

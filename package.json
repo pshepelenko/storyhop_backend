@@ -21,6 +21,7 @@
     "release:check": "npm run verify && npm test -- --runInBand && npm run test:e2e -- --runInBand && npm run smoke:migrations",
     "seed:demo-media": "node scripts/seed-demo-story-media.cjs",
     "seed:demo": "ts-node -r tsconfig-paths/register src/scripts/seed-demo-story.ts",
+    "import:demo-media": "ts-node -r tsconfig-paths/register src/scripts/import-demo-story-media.ts",
     "backfill:season-titles": "ts-node -r tsconfig-paths/register src/scripts/backfill-season-titles.ts",
     "diagnose:openrouter": "node scripts/diagnose-openrouter.cjs",
     "smoke:pixazo-r2": "node scripts/smoke-pixazo-r2.cjs",
