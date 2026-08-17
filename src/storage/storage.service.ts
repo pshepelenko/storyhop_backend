@@ -55,12 +55,16 @@ export class StorageService {
     return this.bucket;
   }
 
-  async download(key: string): Promise<{ body: Buffer; contentType: string }> {
+  async download(
+    key: string,
+    range?: string,
+  ): Promise<{ body: Buffer; contentType: string; contentLength: number; contentRange?: string }> {
     const bucket = this.getBucket();
     const result = await this.getClient().send(
       new GetObjectCommand({
         Bucket: bucket,
         Key: key,
+        ...(range ? { Range: range } : {}),
       }),
     );
 
@@ -75,6 +79,8 @@ export class StorageService {
     return {
       body: Buffer.concat(chunks),
       contentType: result.ContentType || 'application/octet-stream',
+      contentLength: result.ContentLength ?? Buffer.concat(chunks).length,
+      contentRange: result.ContentRange,
     };
   }
 
