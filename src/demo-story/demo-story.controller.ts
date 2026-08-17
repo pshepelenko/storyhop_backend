@@ -43,4 +43,14 @@ export class DemoStoryController {
       throw new HttpException(error?.message || 'Could not seed demo story media', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
+
+  @Post('seed/import-media')
+  async importMedia() {
+    assertMaintenanceRouteEnabled();
+    try {
+      return await this.demoStoryService.importMediaSnapshot();
+    } catch (error) {
+      throw new HttpException(error?.message || 'Could not import demo story media', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
 }
