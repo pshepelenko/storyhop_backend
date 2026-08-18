@@ -116,6 +116,15 @@ export class StorageService {
   }
 
   extractKeyFromUrl(url: string): string | null {
+    try {
+      const parsed = new URL(url);
+      if (parsed.pathname.endsWith('/storage-proxy')) {
+        const proxyKey = parsed.searchParams.get('key');
+        if (proxyKey) return proxyKey;
+      }
+    } catch {
+      // Keep matching legacy direct-storage URLs below.
+    }
     const bucket = this.getBucket();
     const patterns = [
       new RegExp(`/${bucket}/([^?]+)`),

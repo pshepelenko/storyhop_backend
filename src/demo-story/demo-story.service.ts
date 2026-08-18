@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { OpenRouterService } from '../openrouter/openrouter.service';
 import { PixazoService } from '../pixazo/pixazo.service';
 import { StorageService } from '../storage/storage.service';
+import { AudioMetadataService } from '../audio-metadata/audio-metadata.service';
 import { DemoStory } from './demo-story.entity';
 import { DemoStoryNode } from './demo-story-node.entity';
 import { DEMO_MEDIA_VERSION, DEMO_STORY_ID, DEMO_STORY_SLUG, demoStoryContent, demoStoryNodes } from './demo-story.content';
@@ -19,6 +20,7 @@ export class DemoStoryService {
     private readonly openRouter: OpenRouterService,
     private readonly pixazo: PixazoService,
     private readonly storage: StorageService,
+    private readonly audioMetadata: AudioMetadataService,
   ) {}
 
   async getDemoStory(slug = DEMO_STORY_SLUG) {
@@ -89,7 +91,8 @@ export class DemoStoryService {
         if (existing?.audioUrl) continue;
         const storageKey = `demo-story/${story.slug}/${DEMO_MEDIA_VERSION}/audio/${node.nodeKey}-${item.id}.mp3`;
         const audioBuffer = await this.openRouter.generateTts(item.text, undefined, 0.82);
-        const audioUrl = await this.storage.upload(storageKey, audioBuffer, 'audio/mpeg');
+        const normalized = this.audioMetadata.normalizeMp3(audioBuffer);
+        const audioUrl = await this.storage.upload(storageKey, normalized.buffer, 'audio/mpeg');
         audioById.set(item.id, {
           id: item.id,
           type: item.type,
@@ -97,6 +100,7 @@ export class DemoStoryService {
           text: item.text,
           status: 'ready',
           audioUrl,
+          durationSeconds: normalized.durationSeconds,
         });
       }
 

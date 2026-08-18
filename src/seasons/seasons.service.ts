@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { JsonGenerationOptions, OpenRouterService } from '../openrouter/openrouter.service';
 import { PixazoService } from '../pixazo/pixazo.service';
 import { StorageService } from '../storage/storage.service';
+import { AudioMetadataService } from '../audio-metadata/audio-metadata.service';
 import { PromptsService } from '../prompts/prompts.service';
 import { validateSeasonFramework } from './framework-validator';
 import { Season } from './entities/season.entity';
@@ -200,6 +201,7 @@ export class SeasonsService {
     private readonly seasonCharactersService: SeasonCharactersService,
     private readonly ttiPromptService: TtiPromptService,
     private readonly storage: StorageService,
+    private readonly audioMetadata: AudioMetadataService,
     private readonly prompts: PromptsService,
     private readonly logger: FileLogger,
   ) {}
@@ -5733,7 +5735,9 @@ The image must be suitable as a visual consistency reference for future story il
       throw new Error('TTS job contains Cyrillic text while Story language must be English');
     }
     const audioBuffer = await this.openRouter.generateTts(text, voice, speed);
-    return this.storage.upload(storageKey, audioBuffer, 'audio/mpeg');
+    const normalized = this.audioMetadata.normalizeMp3(audioBuffer);
+    const audioUrl = await this.storage.upload(storageKey, normalized.buffer, 'audio/mpeg');
+    return { audioUrl, durationSeconds: normalized.durationSeconds };
   }
 
   /** Keep TTS/speech fragments English-only; drop Cyrillic without failing the season. */
@@ -6506,20 +6510,20 @@ The image must be suitable as a visual consistency reference for future story il
 
       const voice = payload.voice || undefined;
       const speed = typeof payload.speed === 'number' ? payload.speed : undefined;
-      const audioUrl = dryRun
-        ? this.buildDryRunAudioUrl(metadata.chunkId || job.jobId)
+      const audio = dryRun
+        ? { audioUrl: this.buildDryRunAudioUrl(metadata.chunkId || job.jobId), durationSeconds: 0 }
         : await this.generateTtsAndUpload(
             payload.text || '',
             `audio/seasons/${job.seasonId}/${episode.episodeId}/${metadata.chunkId || job.jobId}.mp3`,
             voice,
             speed,
           );
-      await this.persistEpisodeTtsResult(job, episode.episodeId, metadata, audioUrl, dryRun);
+      await this.persistEpisodeTtsResult(job, episode.episodeId, metadata, audio.audioUrl, audio.durationSeconds, dryRun);
 
       return {
         jobId: job.jobId,
         status: dryRun ? 'ready_dry_run' : 'ready',
-        audioUrl,
+        audioUrl: audio.audioUrl,
       };
     } catch (error) {
       job.status = 'failed';
@@ -7342,20 +7346,20 @@ The image must be suitable as a visual consistency reference for future story il
 
       const voice = payload.voice || undefined;
       const speed = typeof payload.speed === 'number' ? payload.speed : undefined;
-      const audioUrl = dryRun
-        ? this.buildDryRunAudioUrl(metadata.chunkId || job.jobId)
+      const audio = dryRun
+        ? { audioUrl: this.buildDryRunAudioUrl(metadata.chunkId || job.jobId), durationSeconds: 0 }
         : await this.generateTtsAndUpload(
             payload.text || '',
             `audio/seasons/${job.seasonId}/prepared/${preparedEpisodeId}/${metadata.chunkId || job.jobId}.mp3`,
             voice,
             speed,
           );
-      await this.persistPreparedTtsResult(job, preparedEpisodeId, metadata, audioUrl, dryRun);
+      await this.persistPreparedTtsResult(job, preparedEpisodeId, metadata, audio.audioUrl, audio.durationSeconds, dryRun);
 
       return {
         jobId: job.jobId,
         status: dryRun ? 'ready_dry_run' : 'ready',
-        audioUrl,
+        audioUrl: audio.audioUrl,
       };
     } catch (error) {
       job.status = 'failed';
@@ -8862,6 +8866,7 @@ Requirements:
     episodeId: string,
     metadata: Record<string, any>,
     audioUrl: string,
+    durationSeconds: number,
     dryRun: boolean,
   ) {
     const queryRunner = this.dataSource.createQueryRunner();
@@ -8883,6 +8888,7 @@ Requirements:
         metadata.chunkId,
         dryRun ? 'ready_dry_run' : 'ready',
         audioUrl,
+        durationSeconds,
       );
       if (!matched) {
         throw new Error(`Episode TTS chunk ${metadata.chunkId || 'unknown'} was not found`);
@@ -8896,6 +8902,7 @@ Requirements:
       job.status = dryRun ? 'ready_dry_run' : 'ready';
       job.result = {
         audioUrl,
+        durationSeconds,
         chunkId: metadata.chunkId || null,
         dryRun,
       };
@@ -8917,6 +8924,7 @@ Requirements:
     preparedEpisodeId: string,
     metadata: Record<string, any>,
     audioUrl: string,
+    durationSeconds: number,
     dryRun: boolean,
   ) {
     const queryRunner = this.dataSource.createQueryRunner();
@@ -8941,6 +8949,7 @@ Requirements:
         metadata.chunkId,
         dryRun ? 'ready_dry_run' : 'ready',
         audioUrl,
+        durationSeconds,
       );
       if (!matched) {
         throw new Error(`Prepared TTS chunk ${metadata.chunkId || 'unknown'} was not found for ${preparedEpisodeId}`);
@@ -8957,6 +8966,7 @@ Requirements:
       job.status = dryRun ? 'ready_dry_run' : 'ready';
       job.result = {
         audioUrl,
+        durationSeconds,
         chunkId: metadata.chunkId || null,
         dryRun,
       };
@@ -8978,6 +8988,7 @@ Requirements:
     chunkId: string,
     status: 'ready' | 'ready_dry_run',
     audioUrl: string,
+    durationSeconds: number,
   ) {
     let matched = false;
     const updated = (audioChunks || []).map((chunk) => {
@@ -8989,6 +9000,7 @@ Requirements:
         ...chunk,
         status,
         audioUrl,
+        ...(durationSeconds > 0 ? { durationSeconds } : {}),
       };
     });
     return { chunks: updated, matched };
