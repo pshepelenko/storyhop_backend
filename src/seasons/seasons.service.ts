@@ -71,6 +71,7 @@ const SEASON_TITLE_PROMPT_VERSION = 'season-title-v1';
 const EPISODE_MIN_WORDS = 240;
 const EPISODE_MAX_WORDS = 320;
 const ILLUSTRATION_UNLOCK_COST = 3;
+const INITIAL_CRYSTAL_GRANT = 9;
 const PREPARED_EPISODE_PROSE_MAX_ATTEMPTS = 3;
 const PREPARED_EPISODE_PROSE_RETRY_DELAYS_MS = [2000, 5000, 10000];
 const CHAPTER_TTS_MAX_CHARS = 600;
@@ -4862,6 +4863,7 @@ The image should make ${childName}'s season feel personal, magical, and immediat
     const now = new Date();
 
     let primaryWallet = ownerWallets[0];
+    let createdInitialWallet = false;
     if (!primaryWallet) {
       if (!seasonId) {
         throw new Error(`Crystal wallet season context is required for first wallet creation: ${ownerUserId}`);
@@ -4875,6 +4877,7 @@ The image should make ${childName}'s season feel personal, magical, and immediat
         updatedAt: now,
       });
       ownerWallets.push(primaryWallet);
+      createdInitialWallet = true;
     }
 
     const normalizedBalance = await this.computeOwnerCrystalBalance(ownerUserId);
@@ -4886,6 +4889,22 @@ The image should make ${childName}'s season feel personal, magical, and immediat
     }
 
     const savedWallets = await this.crystalWalletsRepository.save(ownerWallets);
+    if (createdInitialWallet) {
+      await this.crystalLedgerRepository.save(
+        this.crystalLedgerRepository.create({
+          ledgerEntryId: uuidv4(),
+          walletId: savedWallets[0].walletId,
+          ownerUserId,
+          seasonId: savedWallets[0].seasonId,
+          direction: 'credit',
+          amount: INITIAL_CRYSTAL_GRANT,
+          reason: 'initial_crystal_grant',
+          metadata: { source: 'first_season', illustrationCredits: 3 },
+          createdAt: now,
+        }),
+      );
+      return this.getOrCreateCrystalWallet(ownerUserId, seasonId);
+    }
     return savedWallets[0];
   }
 
