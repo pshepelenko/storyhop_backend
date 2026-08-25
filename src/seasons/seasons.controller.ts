@@ -63,6 +63,8 @@ export class SeasonsController {
       };
       storyDirection?: Record<string, any>;
       heroDirection?: Record<string, any>;
+      draftId?: string;
+      idempotencyKey?: string;
     },
     @CurrentUser() user: User,
   ) {
@@ -73,6 +75,19 @@ export class SeasonsController {
       if (error instanceof HttpException) throw error;
       throw new HttpException(error?.message || 'Season start failed', HttpStatus.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  @Get('draft/current')
+  async getCurrentDraft(@CurrentUser() user: User) {
+    return this.seasonsService.getActiveSeasonDraft(user.userId);
+  }
+
+  @Post('draft')
+  async saveDraft(
+    @Body() body: { draftId?: string; payload?: Record<string, any>; step?: number },
+    @CurrentUser() user: User,
+  ) {
+    return this.seasonsService.saveSeasonDraft(user.userId, body || {});
   }
 
   @Get('users/me')
@@ -230,7 +245,7 @@ export class SeasonsController {
     @Body()
     body: {
       answer?: string;
-      mode?: 'audio' | 'translation';
+      mode?: 'audio';
     },
   ) {
     try {
@@ -246,7 +261,7 @@ export class SeasonsController {
     @Param('seasonId') seasonId: string,
     @Body()
     body: {
-      hintType?: 'first_letter' | 'translation';
+      hintType?: 'explanation';
     },
   ) {
     try {

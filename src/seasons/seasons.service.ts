@@ -1,7 +1,7 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import axios from 'axios';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { JsonGenerationOptions, OpenRouterService } from '../openrouter/openrouter.service';
 import { PixazoService } from '../pixazo/pixazo.service';
@@ -23,6 +23,7 @@ import { PreparedEpisode } from './entities/prepared-episode.entity';
 import { SeasonCharacter } from './entities/season-character.entity';
 import { LearningEvent } from './entities/learning-event.entity';
 import { BonusPracticeState } from './entities/bonus-practice-state.entity';
+import { SeasonDraft } from './entities/season-draft.entity';
 import { ChildProfile } from '../users/entities/child-profile.entity';
 import { SeasonCharactersService } from './tti/season-characters.service';
 import { TtiPromptService } from './tti/tti-prompt.service';
@@ -58,6 +59,8 @@ type StartSeasonPayload = {
   };
   storyDirection?: Record<string, any>;
   heroDirection?: Record<string, any>;
+  draftId?: string;
+  idempotencyKey?: string;
 };
 
 const PROMPT_VERSION = 'season-v3';
@@ -111,7 +114,6 @@ type PendingSpeakingPhrase = {
 
 type WritingChallengeWord = {
   term: string;
-  translationRu: string;
   meaningInContext?: string;
   episodeId?: string | null;
   episodeNumber?: number | null;
@@ -119,7 +121,7 @@ type WritingChallengeWord = {
 
 type WritingWordProgress = {
   term: string;
-  hintsUsed: ('first_letter' | 'translation')[];
+  hintsUsed: ('first_letter' | 'translation' | 'explanation')[];
   attempts: number;
   reward: number;
   rewardEligible?: boolean;
@@ -196,6 +198,8 @@ export class SeasonsService {
     private readonly bonusPracticeStatesRepository: Repository<BonusPracticeState>,
     @InjectRepository(ChildProfile)
     private readonly childProfilesRepository: Repository<ChildProfile>,
+    @InjectRepository(SeasonDraft)
+    private readonly seasonDraftsRepository: Repository<SeasonDraft>,
     private readonly dataSource: DataSource,
     private readonly openRouter: OpenRouterService,
     private readonly pixazo: PixazoService,
@@ -208,6 +212,83 @@ export class SeasonsService {
   ) {}
 
   async startSeason(payload: StartSeasonPayload) {
+    if (payload.draftId && payload.idempotencyKey) {
+      return this.startSeasonFromDraft(payload);
+    }
+    return this.createSeasonShell(payload);
+  }
+
+  async getActiveSeasonDraft(ownerUserId: string) {
+    return this.seasonDraftsRepository.findOne({
+      where: { ownerUserId, status: 'active' },
+      order: { updatedAt: 'DESC' },
+    });
+  }
+
+  async saveSeasonDraft(ownerUserId: string, body: {
+    draftId?: string;
+    payload?: Record<string, any>;
+    step?: number;
+  }) {
+    const now = new Date();
+    const step = Math.min(3, Math.max(1, Number(body.step) || 1));
+    let draft = body.draftId
+      ? await this.seasonDraftsRepository.findOne({ where: { draftId: body.draftId, ownerUserId } })
+      : await this.getActiveSeasonDraft(ownerUserId);
+
+    if (draft?.status === 'submitted') {
+      return draft;
+    }
+    if (!draft) {
+      draft = this.seasonDraftsRepository.create({
+        draftId: uuidv4(),
+        ownerUserId,
+        payload: body.payload || {},
+        step,
+        status: 'active',
+        createdSeasonId: null,
+        idempotencyKey: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } else {
+      draft.payload = body.payload || draft.payload || {};
+      draft.step = step;
+      draft.updatedAt = now;
+    }
+    return this.seasonDraftsRepository.save(draft);
+  }
+
+  private async startSeasonFromDraft(payload: StartSeasonPayload) {
+    return this.dataSource.transaction(async (manager) => {
+      const drafts = manager.getRepository(SeasonDraft);
+      const existing = await drafts
+        .createQueryBuilder('draft')
+        .setLock('pessimistic_write')
+        .where('draft.draftId = :draftId', { draftId: payload.draftId })
+        .andWhere('draft.ownerUserId = :ownerUserId', { ownerUserId: payload.ownerUserId })
+        .getOne();
+
+      if (!existing) {
+        throw new Error('Черновик создания сезона не найден. Обновите страницу и повторите попытку.');
+      }
+      if (existing.createdSeasonId) {
+        return { seasonId: existing.createdSeasonId, status: 'setup_pending' };
+      }
+      existing.idempotencyKey = payload.idempotencyKey!;
+      existing.updatedAt = new Date();
+      await drafts.save(existing);
+
+      const result = await this.createSeasonShell(payload, manager);
+      existing.createdSeasonId = result.seasonId;
+      existing.status = 'submitted';
+      existing.updatedAt = new Date();
+      await drafts.save(existing);
+      return result;
+    });
+  }
+
+  private async createSeasonShell(payload: StartSeasonPayload, manager?: EntityManager) {
     const seasonId = uuidv4();
     const now = new Date();
     const profile = await this.requireCompleteChildProfile(payload.ownerUserId);
@@ -230,7 +311,9 @@ export class SeasonsService {
       storyWorld: this.resolveStoryWorldContext(payload.storyDirection, payload.world),
     };
 
-    const season = this.seasonsRepository.create({
+    const seasonsRepository = manager?.getRepository(Season) || this.seasonsRepository;
+    const frameworksRepository = manager?.getRepository(SeasonFramework) || this.seasonFrameworksRepository;
+    const season = seasonsRepository.create({
       seasonId,
       ownerUserId: payload.ownerUserId,
       childProfile,
@@ -246,10 +329,10 @@ export class SeasonsService {
       createdAt: now,
       updatedAt: now,
     });
-    await this.seasonsRepository.save(season);
+    await seasonsRepository.save(season);
     await this.getOrCreateCrystalWallet(payload.ownerUserId, seasonId);
 
-    const seasonFramework = this.seasonFrameworksRepository.create({
+    const seasonFramework = frameworksRepository.create({
       id: uuidv4(),
       seasonId,
       framework: {},
@@ -260,7 +343,7 @@ export class SeasonsService {
       createdAt: now,
       updatedAt: now,
     });
-    await this.seasonFrameworksRepository.save(seasonFramework);
+    await frameworksRepository.save(seasonFramework);
 
     return {
       seasonId,
@@ -1027,6 +1110,15 @@ export class SeasonsService {
       return null;
     }
 
+    const mapHints = (hints: unknown): string[] =>
+      Array.from(
+        new Set(
+          (Array.isArray(hints) ? hints : [])
+            .map((hint) => String(hint || '').trim())
+            .filter(Boolean)
+            .map(() => 'explanation'),
+        ),
+      );
     const currentWord = challenge.words[challenge.currentIndex] || null;
     const currentProgress = challenge.progress[challenge.currentIndex] || null;
     const completedWords = challenge.progress.filter((item) => item.completed).length;
@@ -1043,20 +1135,18 @@ export class SeasonsService {
       currentWord: currentWord
         ? {
             term: currentWord.term,
-            translationRu: currentWord.translationRu,
             meaningInContext: currentWord.meaningInContext || '',
-            firstLetter: currentWord.term.charAt(0) || '',
-            hintsUsed: currentProgress?.hintsUsed || [],
+            hintsUsed: mapHints(currentProgress?.hintsUsed),
             revealed: currentProgress?.revealed || false,
             rewardEligible: currentProgress?.rewardEligible ?? true,
           }
         : null,
       words: challenge.words.map((word, index) => ({
         term: word.term,
-        translationRu: word.translationRu,
+        meaningInContext: word.meaningInContext || '',
         completed: challenge.progress[index]?.completed || false,
         reward: challenge.progress[index]?.reward || 0,
-        hintsUsed: challenge.progress[index]?.hintsUsed || [],
+        hintsUsed: mapHints(challenge.progress[index]?.hintsUsed),
         rewardEligible: challenge.progress[index]?.rewardEligible ?? true,
       })),
     };
@@ -1458,7 +1548,7 @@ export class SeasonsService {
         .filter(Boolean),
     );
 
-    const translationByTerm = new Map<string, string>();
+    const meaningByTerm = new Map<string, string>();
     const lastPracticedByTerm = new Map<string, Date>();
     for (const event of [...writingSuccessEvents, ...writingRevealEvents, ...events.filter((e) => e.eventType === 'vocab_exposure')]) {
       const term = this.normalizeBonusWord(String(event.payloadJson?.term || ''));
@@ -1469,9 +1559,9 @@ export class SeasonsService {
       if (!prev || event.createdAt > prev) {
         lastPracticedByTerm.set(term, event.createdAt);
       }
-      const translation = String(event.payloadJson?.translationRu || '').trim();
-      if (translation && !translationByTerm.has(term)) {
-        translationByTerm.set(term, translation);
+      const meaning = String(event.payloadJson?.meaningInContext || '').trim();
+      if (meaning && !meaningByTerm.has(term)) {
+        meaningByTerm.set(term, meaning);
       }
     }
 
@@ -1484,9 +1574,9 @@ export class SeasonsService {
       for (const episode of episodeRows) {
         for (const vocab of Array.isArray(episode.highlightedVocabulary) ? episode.highlightedVocabulary : []) {
           const term = this.normalizeBonusWord(String(vocab?.term || ''));
-          const translationRu = String(vocab?.translationRu || '').trim();
-          if (term && translationRu && !translationByTerm.has(term)) {
-            translationByTerm.set(term, translationRu);
+          const meaningInContext = String(vocab?.meaningInContext || '').trim();
+          if (term && meaningInContext && !meaningByTerm.has(term)) {
+            meaningByTerm.set(term, meaningInContext);
           }
         }
       }
@@ -1548,7 +1638,7 @@ export class SeasonsService {
       const lastPracticedAt = lastPracticedByTerm.get(normalized) || null;
       return {
         word: item.term,
-        translationRu: translationByTerm.get(normalized) || '',
+        meaningInContext: meaningByTerm.get(normalized) || '',
         exposureCount,
         attempts,
         successes,
@@ -1846,6 +1936,23 @@ export class SeasonsService {
     };
   }
 
+  private mapVocabularyForResponse(vocabulary: unknown): Record<string, string>[] {
+    return (Array.isArray(vocabulary) ? vocabulary : [])
+      .map((item: any) => ({
+        term: String(item?.term || '').trim(),
+        meaningInContext: String(item?.meaningInContext || '').trim(),
+        exposureType: String(item?.exposureType || '').trim(),
+      }))
+      .filter((item) => item.term && item.meaningInContext);
+  }
+
+  private mapChoicesForResponse(choices: unknown): Record<string, any>[] {
+    return (Array.isArray(choices) ? choices : []).map((choice: any) => {
+      const { translationRu: _legacyTranslation, ...safeChoice } = choice || {};
+      return safeChoice;
+    });
+  }
+
   private mapEpisodeForResponse(episode: Episode) {
     return {
       episodeId: episode.episodeId,
@@ -1855,8 +1962,8 @@ export class SeasonsService {
       chapterText: episode.chapterText,
       speakingPrompt: episode.speakingPrompt || '',
       introOptionsPhrase: episode.introOptionsPhrase,
-      highlightedVocabulary: episode.highlightedVocabulary,
-      choices: episode.choices,
+      highlightedVocabulary: this.mapVocabularyForResponse(episode.highlightedVocabulary),
+      choices: this.mapChoicesForResponse(episode.choices),
       storyStateDiff: episode.storyStateDiff,
       illustrationCandidate: episode.illustrationCandidate,
       audioChunks: this.mapAudioUrls(episode.audioChunks),
@@ -2605,16 +2712,15 @@ export class SeasonsService {
     for (const episode of episodes) {
       for (const vocab of Array.isArray(episode.highlightedVocabulary) ? episode.highlightedVocabulary : []) {
         const term = String(vocab?.term || '').trim();
-        const translationRu = String(vocab?.translationRu || '').trim();
+        const meaningInContext = String(vocab?.meaningInContext || '').trim();
         const normalized = this.normalizeBonusWord(term);
-        if (!normalized || normalized.length < 2 || seen.has(normalized)) {
+        if (!normalized || normalized.length < 2 || !meaningInContext || seen.has(normalized)) {
           continue;
         }
         seen.add(normalized);
         pool.push({
           term,
-          translationRu,
-          meaningInContext: String(vocab?.meaningInContext || '').trim(),
+          meaningInContext,
           episodeId: episode.episodeId,
           episodeNumber: episode.episodeNumber,
         });
@@ -2737,7 +2843,7 @@ export class SeasonsService {
     seasonId: string,
     payload: {
       answer?: string;
-      mode?: 'audio' | 'translation';
+      mode?: 'audio';
     },
   ) {
     const season = await this.seasonsRepository.findOne({ where: { seasonId } });
@@ -2791,6 +2897,7 @@ export class SeasonsService {
       eventType: 'writing_success',
       payload: {
         term: currentWord.term,
+        meaningInContext: currentWord.meaningInContext || '',
         challengeId: challenge.challengeId,
         hintsUsed: currentProgress.hintsUsed,
         practiceEpisodeNumber: season.currentEpisodeNumber,
@@ -2844,7 +2951,7 @@ export class SeasonsService {
     };
   }
 
-  async requestWritingPracticeHint(seasonId: string, hintType?: 'first_letter' | 'translation') {
+  async requestWritingPracticeHint(seasonId: string, hintType?: 'explanation') {
     const season = await this.seasonsRepository.findOne({ where: { seasonId } });
     if (!season) {
       throw new Error('Season not found');
@@ -2855,7 +2962,7 @@ export class SeasonsService {
     const challenge = this.getWritingActiveChallenge(bonusState);
     const currentWord = challenge.words[challenge.currentIndex];
     const currentProgress = challenge.progress[challenge.currentIndex];
-    const resolvedHintType = hintType === 'translation' ? 'translation' : 'first_letter';
+    const resolvedHintType = 'explanation' as const;
 
     if (!currentProgress.hintsUsed.includes(resolvedHintType)) {
       currentProgress.hintsUsed.push(resolvedHintType);
@@ -2866,7 +2973,7 @@ export class SeasonsService {
 
     return {
       hintType: resolvedHintType,
-      hintValue: resolvedHintType === 'translation' ? currentWord.translationRu : currentWord.term.charAt(0),
+      hintValue: currentWord.meaningInContext || '',
       challenge: this.mapWritingChallengeForResponse(challenge),
     };
   }
@@ -2923,7 +3030,11 @@ export class SeasonsService {
     await this.recordLearningEvent(seasonId, {
       episodeId: currentWord.episodeId || null,
       eventType: 'writing_reveal',
-      payload: { term: currentWord.term, practiceEpisodeNumber: season.currentEpisodeNumber },
+      payload: {
+        term: currentWord.term,
+        meaningInContext: currentWord.meaningInContext || '',
+        practiceEpisodeNumber: season.currentEpisodeNumber,
+      },
     });
     await this.saveBonusPracticeState(bonusState);
 
@@ -6143,7 +6254,6 @@ The image must be suitable as a visual consistency reference for future story il
         choices.push({
           id: 'A',
           text: `Move forward and face ${conflict}.`,
-          translationRu: 'Продолжить путь вперёд.',
           choiceType: 'brave',
           crystalReward: 1,
           expectedStateDiff: {
@@ -6158,7 +6268,6 @@ The image must be suitable as a visual consistency reference for future story il
       choices.push({
         id: 'B',
         text: `Pause, listen carefully, and look for a safer way through ${conflict}.`,
-        translationRu: 'Остановиться, прислушаться и найти более безопасный путь.',
         choiceType: 'clever',
         crystalReward: 1,
         expectedStateDiff: {
@@ -6239,9 +6348,11 @@ The image must be suitable as a visual consistency reference for future story il
       speakingPhraseKey: normalizedContent.speakingPhraseKey || null,
       introOptionsPhrase: normalizedContent.introOptionsPhrase || 'What should the hero do next?',
       highlightedVocabulary: Array.isArray(normalizedContent.highlightedVocabulary)
-        ? normalizedContent.highlightedVocabulary
+        ? this.mapVocabularyForResponse(normalizedContent.highlightedVocabulary)
         : [],
-      choices: Array.isArray(normalizedContent.choices) ? normalizedContent.choices : [],
+      choices: Array.isArray(normalizedContent.choices)
+        ? this.mapChoicesForResponse(normalizedContent.choices)
+        : [],
       storyStateDiff: normalizedContent.storyStateDiff || {},
       illustrationCandidate: {
         ...(normalizedContent.illustrationCandidate || {}),

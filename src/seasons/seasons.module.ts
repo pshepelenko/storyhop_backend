@@ -20,6 +20,7 @@ import { TtiPromptService } from './tti/tti-prompt.service';
 import { LearningEvent } from './entities/learning-event.entity';
 import { ProgressController } from './progress.controller';
 import { ChildProfile } from '../users/entities/child-profile.entity';
+import { SeasonDraft } from './entities/season-draft.entity';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { ChildProfile } from '../users/entities/child-profile.entity';
       BonusPracticeState,
       LearningEvent,
       ChildProfile,
+      SeasonDraft,
     ]),
   ],
   controllers: [SeasonsController, ProgressController],

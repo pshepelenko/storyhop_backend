@@ -414,8 +414,7 @@ Return JSON:
   "highlightedVocabulary": [
     {
       "term": "word or phrase",
-      "translationRu": "Russian translation",
-      "meaningInContext": "short English explanation",
+      "meaningInContext": "very simple English explanation using basic A1-A2 words, 3-10 words",
       "exposureType": "new | review | action"
     }
   ],
@@ -423,7 +422,6 @@ Return JSON:
     {
       "id": "A",
       "text": "choice text in English",
-      "translationRu": "Russian translation",
       "choiceType": "brave | kind | clever | curious | creative",
       "crystalReward": 1,
       "expectedStateDiff": {
@@ -436,7 +434,6 @@ Return JSON:
     {
       "id": "B",
       "text": "a different choice text in English",
-      "translationRu": "Russian translation",
       "choiceType": "brave | kind | clever | curious | creative",
       "crystalReward": 1,
       "expectedStateDiff": {

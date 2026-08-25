@@ -31,6 +31,7 @@ import { ReferralModule } from './referral/referral.module';
 import { Referral } from './seasons/entities/referral.entity';
 import { LearningEvent } from './seasons/entities/learning-event.entity';
 import { BonusPracticeState } from './seasons/entities/bonus-practice-state.entity';
+import { SeasonDraft } from './seasons/entities/season-draft.entity';
 import { DemoStoryModule } from './demo-story/demo-story.module';
 import { DemoStory } from './demo-story/demo-story.entity';
 import { DemoStoryNode } from './demo-story/demo-story-node.entity';
@@ -59,7 +60,7 @@ const envFlag = (...keys: string[]) => env(...keys) === 'true';
         User, AuthSession, ChildProfile, UserPreference,
         Season, SeasonFramework, Hero, Episode, EpisodeChoice,
         GenerationJob, CrystalWallet, CrystalLedgerEntry,
-        Illustration, StorybookEntry, PreparedEpisode, Referral, SeasonCharacter, LearningEvent, BonusPracticeState,
+        Illustration, StorybookEntry, PreparedEpisode, Referral, SeasonCharacter, LearningEvent, BonusPracticeState, SeasonDraft,
         DemoStory, DemoStoryNode,
       ],
       synchronize: envFlag('DB_SYNCHRONIZE', 'DATABASE_SYNCHRONIZE'),

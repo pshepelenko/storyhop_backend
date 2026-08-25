@@ -67,9 +67,9 @@ export const demoStoryNodes = [
       'Mira touches a silver oar. The small leaf-boat wakes up. It glows in the moonlight and moves away from the dock.\n\n"Wait!" says Mira.\n\nLeo jumps into the boat with his brass compass. Bramble, the green river otter, rolls in after him. The boat is already on the river.\n\nClack. Clack. Clack.\n\nA big brass crab steps out of the reeds. Its blue eyes shine. A tiny bell rings inside its shell.\n\n"That is the Moon-River guardian," says Leo. "I think it wants the boat back."\n\n"We did not steal it," says Mira. "It woke up!"\n\nThe river splits in two. On the left, bright rapids jump over glowing rocks. On the right, small lantern boats float near a night market. The crab runs faster. The leaf-boat waits for Mira.',
     introOptionsPhrase: 'Which way should Mira steer the boat?',
     highlightedVocabulary: [
-      { term: 'oar', translationRu: 'весло' },
-      { term: 'dock', translationRu: 'причал' },
-      { term: 'guardian', translationRu: 'страж' },
+      { term: 'oar', meaningInContext: 'A long tool used to move a boat through water.' },
+      { term: 'dock', meaningInContext: 'A place beside water where boats stop.' },
+      { term: 'guardian', meaningInContext: 'A person or creature that protects a place.' },
     ],
     choices: [
       {
@@ -97,9 +97,9 @@ export const demoStoryNodes = [
       'Mira turns the oar left. The leaf-boat jumps into the rapids. Cold water splashes over the front of the boat. Bramble shakes his wet face.\n\nThe Clockwork Crab runs on the rocks beside them. It is fast. Its little bell rings again and again.\n\n"Big wave!" says Leo.\n\nMira holds the oar with both hands. The boat goes up the wave, then comes down with a splash.\n\nAhead, a willow tree hangs over the river. A bright rope swings from one branch. Behind the tree, Mira sees a green cave in the river wall. Soft light moves inside the cave.\n\nLeo points to the rope. "That can take us to the old beacon tower."\n\nBramble points to the green cave. The crab is getting closer.',
     introOptionsPhrase: 'What should Mira do now?',
     highlightedVocabulary: [
-      { term: 'water', translationRu: 'вода' },
-      { term: 'wave', translationRu: 'волна' },
-      { term: 'rope', translationRu: 'веревка' },
+      { term: 'water', meaningInContext: 'The clear liquid that rivers and lakes are made of.' },
+      { term: 'wave', meaningInContext: 'A moving shape of water that rises and falls.' },
+      { term: 'rope', meaningInContext: 'A thick strong cord used to pull or hold things.' },
     ],
     choices: [
       {
@@ -127,9 +127,9 @@ export const demoStoryNodes = [
       'Mira turns the oar right. The leaf-boat slides into the night market. Blue and gold lanterns hang over the water. Little boats move slowly between the stalls.\n\n"Sorry!" says Leo, as they pass a fruit basket.\n\nBramble ducks under paper stars. The Clockwork Crab stops on a small bridge. It opens a tiny map from its shell.\n\nThe market has two ways out. One way is up. Empty baskets move on a rope line toward an old beacon tower. The other way is down. A low tunnel goes under the candle bridge.\n\nLeo looks at the baskets. "We can ride up."\n\nBramble looks at the tunnel. The crab looks at its map. Mira must choose fast.',
     introOptionsPhrase: 'How should the team leave the market?',
     highlightedVocabulary: [
-      { term: 'lanterns', translationRu: 'фонари' },
-      { term: 'basket', translationRu: 'корзина' },
-      { term: 'tunnel', translationRu: 'тоннель' },
+      { term: 'lanterns', meaningInContext: 'Small lights that help people see in the dark.' },
+      { term: 'basket', meaningInContext: 'A container made for carrying things.' },
+      { term: 'tunnel', meaningInContext: 'A passage that goes through or under something.' },
     ],
     choices: [
       {
@@ -157,9 +157,9 @@ export const demoStoryNodes = [
       'Mira lands on the wooden floor of the beacon tower. Leo lands beside her and laughs. Bramble pops out of a rope basket and shakes dust from his fur.\n\nThe Clockwork Crab reaches the steps below them. It raises one brass claw. It does not snap. It points to the dark river.\n\nBlack fog is moving over the water. The beacon lamp is not shining.\n\n"It was not chasing us," says Leo. "It was bringing us here."\n\nMira puts the silver oar into the beacon lamp. The lamp fits the oar like a key. Warm gold light fills the tower.\n\nThe fog moves away. The river is safe again.\n\nThe crab rings its bell three times. It sounds like thank you.',
     introOptionsPhrase: 'The demo path ends here.',
     highlightedVocabulary: [
-      { term: 'beacon', translationRu: 'маяк' },
-      { term: 'fog', translationRu: 'туман' },
-      { term: 'safe', translationRu: 'безопасный' },
+      { term: 'beacon', meaningInContext: 'A strong light that helps people find a place.' },
+      { term: 'fog', meaningInContext: 'A thick cloud near the ground that makes it hard to see.' },
+      { term: 'safe', meaningInContext: 'Not in danger; protected from harm.' },
     ],
     choices: [],
     isEnding: true,
@@ -175,9 +175,9 @@ export const demoStoryNodes = [
       'The leaf-boat slips into the green cave. The river becomes quiet. Water drops fall from the roof like tiny bells.\n\nMira holds up the silver oar. It glows brighter.\n\nLeo touches the cave wall. "Look. These marks are music."\n\nThe marks shine one by one. Bramble hums a soft note. The cave hums back.\n\nMira understands. The crab is not angry. It is keeping the beat. The river needs the right song to open the way home.\n\nMira taps the oar on the boat: one, two, three. Leo claps. Bramble hums. Outside, the Clockwork Crab clicks its legs in the same beat.\n\nA wall opens. Moonlight shines in. The boat floats out to calm water.',
     introOptionsPhrase: 'The demo path ends here.',
     highlightedVocabulary: [
-      { term: 'quiet', translationRu: 'тихий' },
-      { term: 'music', translationRu: 'музыка' },
-      { term: 'home', translationRu: 'дом' },
+      { term: 'quiet', meaningInContext: 'Making little or no sound.' },
+      { term: 'music', meaningInContext: 'Sounds made in a pattern that people enjoy.' },
+      { term: 'home', meaningInContext: 'The place where a person lives.' },
     ],
     choices: [],
     isEnding: true,

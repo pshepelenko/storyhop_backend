@@ -39,6 +39,14 @@ export class DemoStoryService {
       startNodeKey: story.framework?.branching?.start || 'start',
       nodes: nodes.map((node) => ({
         ...node,
+        highlightedVocabulary: Array.isArray(node.highlightedVocabulary)
+          ? node.highlightedVocabulary
+              .filter((item: any) => String(item?.term || '').trim() && String(item?.meaningInContext || '').trim())
+              .map((item: any) => ({
+                term: String(item.term).trim(),
+                meaningInContext: String(item.meaningInContext).trim(),
+              }))
+          : [],
         imageUrl: this.normalizeStorageUrl(node.imageUrl),
         audioChunks: Array.isArray(node.audioChunks)
           ? node.audioChunks.map((chunk: any) => ({

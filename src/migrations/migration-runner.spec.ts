@@ -6,6 +6,12 @@ describe('SQL migration runner', () => {
     expect(resolveMigrationsDir()).toBeTruthy();
   });
 
+  it('includes the durable season-drafts migration', () => {
+    const migrationsDir = resolveMigrationsDir();
+    expect(migrationsDir).toBeTruthy();
+    expect(require('fs').existsSync(require('path').join(migrationsDir!, '011-season-drafts.sql'))).toBe(true);
+  });
+
   it('wraps every pending migration and its ledger insert in one transaction', async () => {
     const runner = {
       connect: jest.fn().mockResolvedValue(undefined),
