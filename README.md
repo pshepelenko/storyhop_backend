@@ -34,7 +34,7 @@ Local development may use `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, an
 
 ## Deploy
 
-Target: Railway. Use `railway.toml`; build is `npm ci && npm run build`, start is `npm run start:prod`, and the Railway healthcheck is `/ready`.
+Target: Railway. Use `railway.toml`; Railpack installs dependencies, then the build command is `npm run build`, start is `npm run start:prod`, and the Railway healthcheck is `/ready`.
 
 Database: Railway Postgres. Object storage: Cloudflare R2. AI: OpenRouter. Production uses a single backend replica with the embedded worker enabled.
 
