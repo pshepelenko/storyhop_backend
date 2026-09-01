@@ -2171,11 +2171,11 @@ export class SeasonsService {
       );
     }
 
-    // Current-episode recovery is user-triggered. The background worker must
-    // not repeatedly probe crystal-gated illustrations for every season.
+    // Reading the episode may recover missing TTS, but must never enqueue an
+    // illustration. Illustration unlocks debit crystals and are explicit user
+    // actions; retrying them from a polling reader caused retry storms.
     if (options.reconcileCurrentEpisodeMedia) {
       await this.enqueueMissingEpisodeTtsJobs(seasonId, focusEpisodeNumber);
-      await this.enqueueMissingEpisodeIllustrationJobs(seasonId, focusEpisodeNumber);
     }
 
     const focusEpisodeId = focusEpisode?.episodeId || null;
@@ -9382,47 +9382,6 @@ Requirements:
 
     if (enqueued > 0) {
       this.logger.warn(`[EpisodeAudio] Enqueued ${enqueued} missing current TTS chunk job(s) for season ${seasonId}`);
-    }
-
-    return enqueued;
-  }
-
-  private async enqueueMissingEpisodeIllustrationJobs(seasonId: string, episodeNumber?: number): Promise<number> {
-    const hero = await this.heroesRepository.findOne({ where: { seasonId } });
-    if (!hero?.heroReferenceImageUrl) {
-      return 0;
-    }
-
-    const season = await this.seasonsRepository.findOne({ where: { seasonId } });
-    if (!season?.currentEpisodeNumber) {
-      return 0;
-    }
-
-    const episodes = await this.episodesRepository.find({
-      where: { seasonId, episodeNumber: episodeNumber || season.currentEpisodeNumber },
-      order: { episodeNumber: 'ASC' },
-    });
-
-    let enqueued = 0;
-    for (const episode of episodes) {
-      if (!episode.illustrationCandidate?.shouldGenerate || !episode.illustrationCandidate?.moment) {
-        continue;
-      }
-
-      const beforePending = await this.generationJobsRepository.count({
-        where: { seasonId, episodeId: episode.episodeId, jobType: 'image_generation', status: 'pending' },
-      });
-      await this.prepareEpisodeIllustration(seasonId, episode, hero);
-      const afterPending = await this.generationJobsRepository.count({
-        where: { seasonId, episodeId: episode.episodeId, jobType: 'image_generation', status: 'pending' },
-      });
-      if (afterPending > beforePending) {
-        enqueued += afterPending - beforePending;
-      }
-    }
-
-    if (enqueued > 0) {
-      this.logger.warn(`[Illustration] Enqueued ${enqueued} missing current illustration job(s) for season ${seasonId}`);
     }
 
     return enqueued;
