@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OpenRouterModule } from '../openrouter/openrouter.module';
-import { PixazoModule } from '../pixazo/pixazo.module';
 import { StorageModule } from '../storage/storage.module';
 import { AudioMetadataModule } from '../audio-metadata/audio-metadata.module';
 import { DemoStoryController } from './demo-story.controller';
@@ -13,7 +12,6 @@ import { DemoStoryService } from './demo-story.service';
   imports: [
     TypeOrmModule.forFeature([DemoStory, DemoStoryNode]),
     OpenRouterModule,
-    PixazoModule,
     StorageModule,
     AudioMetadataModule,
   ],

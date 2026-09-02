@@ -11,7 +11,6 @@ describe('production configuration', () => {
     SESSION_COOKIE_DOMAIN: '.story-hop.com',
     HEALTH_DIAGNOSTICS_TOKEN: 'health-secret',
     OPEN_ROUTER_API_KEY: 'openrouter-secret',
-    PIXAZO_API_KEY: 'pixazo-secret',
     R2_BUCKET: 'storyhop',
     CLOUDFLARE_S3_API: 'https://key:secret@account.r2.cloudflarestorage.com/storyhop',
     WORKER_ENABLED: 'true',

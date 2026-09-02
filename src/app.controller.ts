@@ -3,7 +3,6 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { AppService } from './app.service';
 import { OpenRouterService } from './openrouter/openrouter.service';
-import { PixazoService } from './pixazo/pixazo.service';
 import { StorageService } from './storage/storage.service';
 
 @Controller()
@@ -11,7 +10,6 @@ export class AppController {
   constructor(
     private readonly appService: AppService,
     private readonly openRouter: OpenRouterService,
-    private readonly pixazo: PixazoService,
     private readonly storage: StorageService,
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
@@ -49,11 +47,10 @@ export class AppController {
     let r2 = { available: true, error: undefined as string | undefined };
     try { this.storage.getBucket(); this.storage.getClient(); } catch (error) { r2 = { available: false, error: this.safeDependencyError(error) }; }
     const openRouterAvailable = !openRouterError && models.length > 0 && models.every((model) => model.available);
-    const pixazoConfigured = Boolean(process.env.PIXAZO_API_KEY);
     return {
-      status: openRouterAvailable && pixazoConfigured && r2.available ? 'ok' : 'degraded',
+      status: openRouterAvailable && r2.available ? 'ok' : 'degraded',
       openRouter: { available: openRouterAvailable, models, ...(openRouterError ? { error: openRouterError } : {}) },
-      pixazo: { configured: pixazoConfigured, model: this.pixazo.getImageModelLabel() },
+      imageGeneration: { provider: 'openrouter', model: this.openRouter.getImageModelLabel() },
       r2,
     };
   }

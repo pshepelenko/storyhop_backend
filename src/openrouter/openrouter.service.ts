@@ -11,6 +11,8 @@ export interface OpenRouterConfig {
   ttsModel: string;
   ttsVoice: string;
   imageModel: string;
+  imageAspectRatio: string;
+  imageQuality: string;
   apiKey: string;
   frontendUrl: string;
   storyProviderOrder: string[];
@@ -19,6 +21,12 @@ export interface OpenRouterConfig {
   seasonProviderOrder: string[];
   seasonProviderSort: string;
   seasonProviderAllowFallbacks: boolean;
+}
+
+export interface OpenRouterImageGenerationResult {
+  body: Buffer;
+  contentType: string;
+  requestId: string | null;
 }
 
 export interface JsonGenerationOptions {
@@ -59,7 +67,9 @@ export class OpenRouterService {
       seasonReasoningEffort: process.env.OPENROUTER_SEASON_REASONING || 'medium',
       ttsModel: process.env.OPENROUTER_TTS_MODEL || 'hexgrad/kokoro-82m',
       ttsVoice: process.env.OPENROUTER_TTS_VOICE || 'bm_lewis',
-      imageModel: process.env.OPENROUTER_IMAGE_MODEL || 'black-forest-labs/flux.2-klein-4b',
+      imageModel: process.env.OPENROUTER_IMAGE_MODEL || 'openai/gpt-image-2',
+      imageAspectRatio: process.env.OPENROUTER_IMAGE_ASPECT_RATIO || '3:2',
+      imageQuality: process.env.OPENROUTER_IMAGE_QUALITY || 'low',
       apiKey: process.env.OPEN_ROUTER_API_KEY || process.env.OPENROUTER_API_KEY || '',
       frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3001',
       storyProviderOrder,
@@ -364,38 +374,50 @@ export class OpenRouterService {
     }
   }
 
-  async generateImage(prompt: string): Promise<{ url: string } | null> {
+  getImageModelLabel(): string {
+    return this.config.imageModel;
+  }
+
+  async generateImage(prompt: string): Promise<OpenRouterImageGenerationResult> {
     try {
       const response = await axios.post(
-        'https://openrouter.ai/api/v1/chat/completions',
+        'https://openrouter.ai/api/v1/images',
         {
           model: this.config.imageModel,
-          messages: [{ role: 'user', content: prompt }],
-          modalities: ['image'],
+          prompt,
+          aspect_ratio: this.config.imageAspectRatio,
+          quality: this.config.imageQuality,
+          background: 'opaque',
+          n: 1,
         },
-        { headers: this.authHeaders(), timeout: 120000 },
+        { headers: this.authHeaders(), timeout: 180000 },
       );
 
-      const url = this.extractImageUrl(response.data);
-      if (!url) {
-        this.logger.error(`[OpenRouter] generateImage returned empty URL, response: ${JSON.stringify(response.data).slice(0, 500)}`);
-        return null;
+      const encoded = response.data?.data?.[0]?.b64_json;
+      if (typeof encoded !== 'string' || !encoded.trim()) {
+        throw new Error('OpenRouter image response did not include b64_json');
       }
-      return { url };
+
+      const body = Buffer.from(encoded, 'base64');
+      if (!body.length) {
+        throw new Error('OpenRouter image response decoded to an empty buffer');
+      }
+
+      const contentType = String(
+        response.data?.data?.[0]?.media_type || response.data?.data?.[0]?.mime_type || 'image/png',
+      );
+      if (!contentType.startsWith('image/')) {
+        throw new Error(`OpenRouter image response returned unsupported content type: ${contentType}`);
+      }
+
+      const requestId = String(
+        response.headers?.['x-request-id'] || response.headers?.['request-id'] || '',
+      ).trim() || null;
+      return { body, contentType, requestId };
     } catch (error) {
       this.logger.logOpenRouterError(`generateImage [${this.config.imageModel}]`, error);
       throw error;
     }
-  }
-
-  private extractImageUrl(data: any): string | null {
-    const message = data?.choices?.[0]?.message;
-    const directUrl = message?.images?.[0]?.image_url?.url || message?.image_url?.url;
-    if (directUrl) return directUrl;
-
-    const content = Array.isArray(message?.content) ? message.content : [];
-    const imagePart = content.find((part: any) => part?.image_url?.url || part?.url || part?.type === 'image_url');
-    return imagePart?.image_url?.url || imagePart?.url || data?.url || null;
   }
 
   async generateTts(text: string, voice?: string, speed?: number): Promise<Buffer> {
@@ -439,6 +461,14 @@ export class OpenRouterService {
 
     for (const model of modelsToCheck) {
       try {
+        if (model === this.config.imageModel || model === this.config.ttsModel) {
+          await axios.get(
+            `https://openrouter.ai/api/v1/models/${encodeURIComponent(model)}/endpoints`,
+            { headers: this.authHeaders(), timeout: 15000 },
+          );
+          results.push({ model, available: true });
+          continue;
+        }
         const provider = model === this.config.chatModel
           ? this.buildStoryProviderRouting()
           : model === this.config.seasonModel

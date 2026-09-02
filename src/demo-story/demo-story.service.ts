@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import axios from 'axios';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { OpenRouterService } from '../openrouter/openrouter.service';
-import { PixazoService } from '../pixazo/pixazo.service';
 import { StorageService } from '../storage/storage.service';
 import { AudioMetadataService } from '../audio-metadata/audio-metadata.service';
 import { DemoStory } from './demo-story.entity';
@@ -18,7 +16,6 @@ export class DemoStoryService {
     @InjectRepository(DemoStoryNode)
     private readonly demoNodes: Repository<DemoStoryNode>,
     private readonly openRouter: OpenRouterService,
-    private readonly pixazo: PixazoService,
     private readonly storage: StorageService,
     private readonly audioMetadata: AudioMetadataService,
   ) {}
@@ -114,19 +111,12 @@ export class DemoStoryService {
 
       let imageUrl = node.imageUrl;
       if (!imageUrl) {
-        const imageResult = await this.pixazo.generateImage(node.illustrationPrompt);
-        if (!imageResult?.url) {
-          throw new Error(`Pixazo did not return an image for ${node.nodeKey}`);
-        }
-        const imageResponse = await axios.get(imageResult.url, {
-          responseType: 'arraybuffer',
-          timeout: 120000,
-        });
+        const imageResult = await this.openRouter.generateImage(node.illustrationPrompt);
         const storageKey = `demo-story/${story.slug}/${DEMO_MEDIA_VERSION}/images/${node.nodeKey}.png`;
         imageUrl = await this.storage.upload(
           storageKey,
-          Buffer.from(imageResponse.data),
-          imageResponse.headers['content-type'] || 'image/png',
+          imageResult.body,
+          imageResult.contentType,
         );
       }
 

@@ -3,8 +3,7 @@ import { AppController } from './app.controller';
 
 describe('AppController release health', () => {
   const appService = { getHello: jest.fn(() => 'Hello World!') };
-  const openRouter = { checkModelsHealth: jest.fn() };
-  const pixazo = { getImageModelLabel: jest.fn(() => 'gpt-image-2') };
+  const openRouter = { checkModelsHealth: jest.fn(), getImageModelLabel: jest.fn(() => 'openai/gpt-image-2') };
   const storage = { getBucket: jest.fn(() => 'storyhop'), getClient: jest.fn(() => ({})) };
   const dataSource = { query: jest.fn() };
   let controller: AppController;
@@ -16,7 +15,6 @@ describe('AppController release health', () => {
     controller = new AppController(
       appService as any,
       openRouter as any,
-      pixazo as any,
       storage as any,
       dataSource as any,
     );

@@ -1,10 +1,8 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import axios from 'axios';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { JsonGenerationOptions, OpenRouterService } from '../openrouter/openrouter.service';
-import { PixazoService } from '../pixazo/pixazo.service';
 import { StorageService } from '../storage/storage.service';
 import { AudioMetadataService } from '../audio-metadata/audio-metadata.service';
 import { PromptsService } from '../prompts/prompts.service';
@@ -80,11 +78,8 @@ const PREPARED_EPISODE_PROSE_RETRY_DELAYS_MS = [2000, 5000, 10000];
 const CHAPTER_TTS_MAX_CHARS = 600;
 const CHAPTER_TTS_MAX_WORDS = 110;
 const CHAPTER_TTS_MAX_PARTS = 3;
-const PIXAZO_CIRCUIT_WINDOW_MS = 10 * 60 * 1000;
-const PIXAZO_CIRCUIT_FAILURE_THRESHOLD = 3;
-const ILLUSTRATION_DOWNLOAD_MAX_ATTEMPTS = 6;
-const ILLUSTRATION_DOWNLOAD_RETRY_DELAYS_MS = [2000, 5000, 10000, 15000, 20000, 30000];
-const ILLUSTRATION_DOWNLOAD_TIMEOUT_MS = 120000;
+const IMAGE_PROVIDER_CIRCUIT_WINDOW_MS = 10 * 60 * 1000;
+const IMAGE_PROVIDER_CIRCUIT_FAILURE_THRESHOLD = 3;
 const ILLUSTRATION_UPLOAD_MAX_ATTEMPTS = 2;
 const PREPARED_ILLUSTRATION_MODERATION_MAX_ATTEMPTS = 3;
 const STALE_PROCESSING_JOB_TIMEOUT_MS = 3 * 60 * 1000;
@@ -103,7 +98,7 @@ type ActiveGenerationJobForWorker = Pick<GenerationJob, 'seasonId' | 'jobType' |
 
 /**
  * A worker pass is driven by queued work, not the age/status of a season.
- * Live media stays ahead of prefetch so a newly unlocked scene reaches Pixazo.
+ * Live media stays ahead of prefetch so a newly unlocked scene reaches the image provider.
  */
 export const orderSeasonIdsForWorker = (jobs: ActiveGenerationJobForWorker[]): string[] => {
   const liveJobTypes = new Set(['tts_chunk', 'image_generation']);
@@ -201,8 +196,8 @@ export class SeasonsService {
   private readonly heroReferenceImageInFlight = new Map<string, Promise<void>>();
   private readonly seasonCoverInFlight = new Map<string, Promise<void>>();
   private readonly seasonTitleQueueInFlight = new Map<string, Promise<void>>();
-  /** Recent Pixazo failure timestamps for prefetch image circuit-breaking. */
-  private readonly pixazoFailureTimestamps: number[] = [];
+  /** Recent image-provider failure timestamps for prefetch image circuit-breaking. */
+  private readonly imageProviderFailureTimestamps: number[] = [];
 
   constructor(
     @InjectRepository(Season)
@@ -237,7 +232,6 @@ export class SeasonsService {
     private readonly seasonDraftsRepository: Repository<SeasonDraft>,
     private readonly dataSource: DataSource,
     private readonly openRouter: OpenRouterService,
-    private readonly pixazo: PixazoService,
     private readonly seasonCharactersService: SeasonCharactersService,
     private readonly ttiPromptService: TtiPromptService,
     private readonly storage: StorageService,
@@ -3628,26 +3622,26 @@ export class SeasonsService {
     return String(job.jobType || '').startsWith('prepared_');
   }
 
-  private recordPixazoFailure() {
+  private recordImageProviderFailure() {
     const now = Date.now();
-    this.pixazoFailureTimestamps.push(now);
+    this.imageProviderFailureTimestamps.push(now);
     while (
-      this.pixazoFailureTimestamps.length &&
-      now - this.pixazoFailureTimestamps[0] > PIXAZO_CIRCUIT_WINDOW_MS
+      this.imageProviderFailureTimestamps.length &&
+      now - this.imageProviderFailureTimestamps[0] > IMAGE_PROVIDER_CIRCUIT_WINDOW_MS
     ) {
-      this.pixazoFailureTimestamps.shift();
+      this.imageProviderFailureTimestamps.shift();
     }
   }
 
   private shouldSkipPrefetchImages(): boolean {
     const now = Date.now();
     while (
-      this.pixazoFailureTimestamps.length &&
-      now - this.pixazoFailureTimestamps[0] > PIXAZO_CIRCUIT_WINDOW_MS
+      this.imageProviderFailureTimestamps.length &&
+      now - this.imageProviderFailureTimestamps[0] > IMAGE_PROVIDER_CIRCUIT_WINDOW_MS
     ) {
-      this.pixazoFailureTimestamps.shift();
+      this.imageProviderFailureTimestamps.shift();
     }
-    return this.pixazoFailureTimestamps.length >= PIXAZO_CIRCUIT_FAILURE_THRESHOLD;
+    return this.imageProviderFailureTimestamps.length >= IMAGE_PROVIDER_CIRCUIT_FAILURE_THRESHOLD;
   }
 
   private countWords(text: string): number {
@@ -4705,7 +4699,11 @@ export class SeasonsService {
         if (!hero || hero.heroReferenceImageUrl) {
           return;
         }
-        const heroReferenceImageUrl = await this.generateHeroReferenceImage(heroProfile, heroVisualBrief);
+        const heroReferenceImageUrl = await this.generateHeroReferenceImage(
+          seasonId,
+          heroProfile,
+          heroVisualBrief,
+        );
         hero.heroReferenceImageUrl = heroReferenceImageUrl || null;
         hero.updatedAt = new Date();
         await this.heroesRepository.save(hero);
@@ -5670,7 +5668,11 @@ Return JSON:
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
-  private async generateHeroReferenceImage(heroProfile: Record<string, any>, heroVisualBrief: Record<string, any>) {
+  private async generateHeroReferenceImage(
+    seasonId: string,
+    heroProfile: Record<string, any>,
+    heroVisualBrief: Record<string, any>,
+  ) {
     const prompt = `Create a clean full-body character reference image for a recurring hero in a children's interactive story.
 
 Hero profile:
@@ -5692,11 +5694,16 @@ Style:
 The image must be suitable as a visual consistency reference for future story illustrations.`;
 
     try {
-      const result = await this.pixazo.generateImage(prompt);
-      return result?.url || this.buildFallbackHeroReferenceImage(heroProfile, heroVisualBrief);
+      const result = await this.openRouter.generateImage(prompt);
+      return this.uploadGeneratedImageWithRetry(
+        result.body,
+        result.contentType,
+        `seasons/${seasonId}/hero-reference.png`,
+        'openrouter-image-api',
+      );
     } catch (error) {
-      this.logGenerationFallback('Hero reference image', error);
-      return this.buildFallbackHeroReferenceImage(heroProfile, heroVisualBrief);
+      this.logger.logOpenRouterError('generateHeroReferenceImage', error);
+      throw error;
     }
   }
 
@@ -6770,7 +6777,6 @@ The image must be suitable as a visual consistency reference for future story il
             hero,
             payload.promptPayload || illustration.promptPayload || {},
             `images/seasons/${job.seasonId}/storybook/${illustrationId}.png`,
-            { recoveryRequestId: payload.recoveryRequestId || null },
           );
       const imageUrl = generation.imageUrl;
 
@@ -6798,10 +6804,6 @@ The image must be suitable as a visual consistency reference for future story il
         requestId: generation.requestId || null,
       };
       job.error = null;
-      job.payload = {
-        ...(job.payload || {}),
-        recoveryRequestId: null,
-      };
       job.updatedAt = new Date();
       await this.generationJobsRepository.save(job);
       this.logPipelineStep('illustration_job_ready', {
@@ -6819,7 +6821,7 @@ The image must be suitable as a visual consistency reference for future story il
         imageUrl,
       };
     } catch (error) {
-      this.recordPixazoFailure();
+      this.recordImageProviderFailure();
       this.logPipelineStep('illustration_job_failed', {
         seasonId: job.seasonId,
         jobId: job.jobId,
@@ -6841,7 +6843,7 @@ The image must be suitable as a visual consistency reference for future story il
         illustration.status = 'failed';
         illustration.promptPayload = {
           ...(illustration.promptPayload || {}),
-          providerRequestId: this.extractPixazoRequestId(error) || illustration.promptPayload?.providerRequestId || null,
+          providerRequestId: illustration.promptPayload?.providerRequestId || null,
         };
         illustration.updatedAt = new Date();
         await this.illustrationsRepository.save(illustration);
@@ -6859,10 +6861,6 @@ The image must be suitable as a visual consistency reference for future story il
 
       job.status = 'failed';
       job.error = this.formatGenerationError(error);
-      job.payload = {
-        ...(job.payload || {}),
-        recoveryRequestId: this.extractPixazoRequestId(error) || job.payload?.recoveryRequestId || null,
-      };
       job.updatedAt = new Date();
       await this.generationJobsRepository.save(job);
 
@@ -6967,7 +6965,6 @@ The image must be suitable as a visual consistency reference for future story il
             storageKey,
             {
               moderationRetryMode: 'same_prompt_only',
-              recoveryRequestId: payload.recoveryRequestId || null,
             },
           );
 
@@ -7001,10 +6998,6 @@ The image must be suitable as a visual consistency reference for future story il
         requestId: generation.requestId || null,
       };
       job.error = null;
-      job.payload = {
-        ...(job.payload || {}),
-        recoveryRequestId: null,
-      };
       job.updatedAt = new Date();
       await this.generationJobsRepository.save(job);
       this.logPipelineStep('prepared_image_job_ready', {
@@ -7031,10 +7024,7 @@ The image must be suitable as a visual consistency reference for future story il
           preparedIllustration: {
             ...(prepared.payload.preparedIllustration || {}),
             status: 'failed',
-            providerRequestId:
-              this.extractPixazoRequestId(error) ||
-              prepared.payload.preparedIllustration?.providerRequestId ||
-              null,
+            providerRequestId: prepared.payload.preparedIllustration?.providerRequestId || null,
           },
         };
         prepared.updatedAt = new Date();
@@ -7043,13 +7033,9 @@ The image must be suitable as a visual consistency reference for future story il
 
       job.status = 'failed';
       job.error = this.formatGenerationError(error);
-      job.payload = {
-        ...(job.payload || {}),
-        recoveryRequestId: this.extractPixazoRequestId(error) || job.payload?.recoveryRequestId || null,
-      };
       job.updatedAt = new Date();
       await this.generationJobsRepository.save(job);
-      this.recordPixazoFailure();
+      this.recordImageProviderFailure();
       this.logPipelineStep('prepared_image_job_failed', {
         seasonId: job.seasonId,
         jobId: job.jobId,
@@ -8072,7 +8058,6 @@ The image must be suitable as a visual consistency reference for future story il
     storageKey: string,
     options: {
       moderationRetryMode?: 'same_prompt_only' | 'same_prompt_then_safer';
-      recoveryRequestId?: string | null;
     } = {},
   ) {
     const episode = episodeId
@@ -8195,7 +8180,6 @@ The image must be suitable as a visual consistency reference for future story il
         'primary',
         primaryModerationAttempts,
         { preparedPregeneration: moderationRetryMode === 'same_prompt_only' },
-        options.recoveryRequestId || null,
       );
       return { imageUrl: generation.imageUrl, ttiPrompt, requestId: generation.requestId || null };
     } catch (error) {
@@ -8245,41 +8229,16 @@ The image must be suitable as a visual consistency reference for future story il
   private async generateAndStoreIllustration(
     prompt: string,
     storageKey: string,
-    options: { recoveryRequestId?: string | null; allowRetryAfterRecoveryMiss?: boolean } = {},
   ): Promise<{ imageUrl: string; requestId: string | null }> {
-    const recoveryRequestId = options.recoveryRequestId || null;
-    if (recoveryRequestId) {
-      const recovered = await this.pixazo.recoverImage(recoveryRequestId);
-      if (recovered.status === 'completed' && recovered.url) {
-        this.logger.log(
-          `[Illustration] Pixazo recovery succeeded for ${storageKey} via request ${recoveryRequestId}`,
-        );
-        const downloaded = await this.downloadGeneratedImageWithRetry(recovered.url, storageKey);
-        const imageUrl = await this.uploadGeneratedImageWithRetry(
-          downloaded.body,
-          downloaded.contentType,
-          storageKey,
-          recovered.url,
-        );
-        return { imageUrl, requestId: recoveryRequestId };
-      }
-
-      this.logger.warn(
-        `[Illustration] Pixazo recovery miss for ${storageKey} via request ${recoveryRequestId} status=${recovered.status}; starting a fresh generation`,
-      );
-    }
-
-    const result = await this.generatePixazoImageWithTimeoutRecovery(prompt, storageKey);
-    if (!result?.url) {
-      throw new Error('Pixazo image generation returned an empty response');
-    }
-
-    const sourceUrl = result.url;
-    this.logger.log(`[Illustration] Pixazo image ready for ${storageKey}`);
-
-    const downloaded = await this.downloadGeneratedImageWithRetry(sourceUrl, storageKey);
-    const imageUrl = await this.uploadGeneratedImageWithRetry(downloaded.body, downloaded.contentType, storageKey, sourceUrl);
-    return { imageUrl, requestId: result.requestId || null };
+    const result = await this.openRouter.generateImage(prompt);
+    this.logger.log(`[Illustration] OpenRouter image ready for ${storageKey}`);
+    const imageUrl = await this.uploadGeneratedImageWithRetry(
+      result.body,
+      result.contentType,
+      storageKey,
+      'openrouter-image-api',
+    );
+    return { imageUrl, requestId: result.requestId };
   }
 
   private async generateIllustrationWithModerationRetries(
@@ -8288,13 +8247,10 @@ The image must be suitable as a visual consistency reference for future story il
     promptStage: 'primary' | 'fallback',
     maxAttempts = 3,
     options: { preparedPregeneration?: boolean } = {},
-    recoveryRequestId?: string | null,
   ) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        return await this.generateAndStoreIllustration(prompt, storageKey, {
-          recoveryRequestId: attempt === 1 ? recoveryRequestId || null : null,
-        });
+        return await this.generateAndStoreIllustration(prompt, storageKey);
       } catch (error) {
         const isModeration = this.isProtectedContentModerationError(error);
         if (!isModeration || attempt >= maxAttempts) {
@@ -8314,86 +8270,13 @@ The image must be suitable as a visual consistency reference for future story il
           error: this.formatGenerationError(error),
         });
         this.logger.warn(
-          `[Illustration] Pixazo moderation retry for ${storageKey} stage=${promptStage} attempt=${attempt + 1}/${maxAttempts} in ${delayMs}ms`,
+          `[Illustration] OpenRouter moderation retry for ${storageKey} stage=${promptStage} attempt=${attempt + 1}/${maxAttempts} in ${delayMs}ms`,
         );
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
 
     throw new Error('Failed to generate illustration after moderation retries');
-  }
-
-  private async generatePixazoImageWithTimeoutRecovery(prompt: string, storageKey: string) {
-    try {
-      return await this.pixazo.generateImage(prompt);
-    } catch (error) {
-      const requestId = this.extractPixazoRequestId(error);
-      if (!requestId || !this.isPixazoPollTimeoutError(error)) {
-        throw error;
-      }
-
-      this.logger.warn(
-        `[Illustration] Pixazo poll timeout for ${storageKey}; attempting recovery via request ${requestId}`,
-      );
-      const recovered = await this.pixazo.recoverImage(requestId);
-      if (recovered.status === 'completed' && recovered.url) {
-        this.logger.log(
-          `[Illustration] Pixazo recovery succeeded after timeout for ${storageKey} via request ${requestId}`,
-        );
-        return { url: recovered.url, requestId };
-      }
-
-      this.logger.warn(
-        `[Illustration] Pixazo recovery after timeout returned ${recovered.status} for ${storageKey}; starting a fresh generation with the same prompt`,
-      );
-      return await this.pixazo.generateImage(prompt);
-    }
-  }
-
-  private async downloadGeneratedImageWithRetry(
-    sourceUrl: string,
-    storageKey: string,
-  ): Promise<{ body: Buffer; contentType: string }> {
-    for (let attempt = 1; attempt <= ILLUSTRATION_DOWNLOAD_MAX_ATTEMPTS; attempt++) {
-      try {
-        const response = await axios.get(sourceUrl, {
-          responseType: 'arraybuffer',
-          timeout: ILLUSTRATION_DOWNLOAD_TIMEOUT_MS,
-          validateStatus: (status) => status >= 200 && status < 300,
-        });
-        const contentType = String(response.headers?.['content-type'] || 'image/png');
-        const body = Buffer.from(response.data);
-        if (!body.length) {
-          throw new Error('Downloaded image is empty');
-        }
-
-        this.logger.log(
-          `[Illustration] Downloaded ${body.length} bytes from Pixazo CDN for ${storageKey} (attempt ${attempt}/${ILLUSTRATION_DOWNLOAD_MAX_ATTEMPTS})`,
-        );
-        return { body, contentType };
-      } catch (error) {
-        this.logger.logIllustrationStorageError(
-          'pixazo_download',
-          storageKey,
-          sourceUrl,
-          error,
-          attempt,
-          ILLUSTRATION_DOWNLOAD_MAX_ATTEMPTS,
-        );
-
-        if (attempt >= ILLUSTRATION_DOWNLOAD_MAX_ATTEMPTS) {
-          throw new Error(
-            `Failed to download generated illustration after ${ILLUSTRATION_DOWNLOAD_MAX_ATTEMPTS} attempts`,
-          );
-        }
-
-        const delayMs = ILLUSTRATION_DOWNLOAD_RETRY_DELAYS_MS[attempt - 1] ?? 15000;
-        this.logger.warn(`[Illustration] Retrying Pixazo download in ${delayMs}ms for ${storageKey}`);
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-      }
-    }
-
-    throw new Error('Failed to download generated illustration');
   }
 
   private async uploadGeneratedImageWithRetry(
@@ -8780,25 +8663,6 @@ Requirements:
     } catch {
       return String(value);
     }
-  }
-
-  private isPixazoPollTimeoutError(error: any) {
-    const message = String(error?.message || '');
-    return /Pixazo image generation poll timeout/i.test(message);
-  }
-
-  private extractPixazoRequestId(error: any): string | null {
-    const direct = error?.pixazoRequestId;
-    if (typeof direct === 'string' && direct.trim()) {
-      return direct.trim();
-    }
-
-    const responseRequestId = error?.response?.data?.request_id;
-    if (typeof responseRequestId === 'string' && responseRequestId.trim()) {
-      return responseRequestId.trim();
-    }
-
-    return null;
   }
 
   private getEpisodeAudioGenerationStatus(audioChunks: Record<string, any>[]) {

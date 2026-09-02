@@ -22,7 +22,6 @@ import { StorybookEntry } from './seasons/entities/storybook-entry.entity';
 import { PreparedEpisode } from './seasons/entities/prepared-episode.entity';
 import { SeasonCharacter } from './seasons/entities/season-character.entity';
 import { OpenRouterModule } from './openrouter/openrouter.module';
-import { PixazoModule } from './pixazo/pixazo.module';
 import { StorageModule } from './storage/storage.module';
 import { PromptsModule } from './prompts/prompts.module';
 import { LoggingModule } from './logging/logging.module';
@@ -68,7 +67,6 @@ const envFlag = (...keys: string[]) => env(...keys) === 'true';
       ssl: envFlag('DB_SSL', 'DATABASE_SSL') ? { rejectUnauthorized: false } : false,
     }),
     OpenRouterModule,
-    PixazoModule,
     StorageModule,
     PromptsModule,
     LoggingModule,

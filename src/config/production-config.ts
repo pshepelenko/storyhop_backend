@@ -13,7 +13,6 @@ export function validateProductionConfig(): void {
   if (!hasAny('SESSION_COOKIE_DOMAIN')) missing.push('SESSION_COOKIE_DOMAIN');
   if (!hasAny('HEALTH_DIAGNOSTICS_TOKEN')) missing.push('HEALTH_DIAGNOSTICS_TOKEN');
   if (!hasAny('OPEN_ROUTER_API_KEY', 'OPENROUTER_API_KEY')) missing.push('OPEN_ROUTER_API_KEY');
-  if (!hasAny('PIXAZO_API_KEY')) missing.push('PIXAZO_API_KEY');
   if (!hasAny('R2_BUCKET', 'CLOUDFLARE_R2_BUCKET')) missing.push('R2_BUCKET');
   const rawR2Url = process.env.CLOUDFLARE_S3_API?.trim();
   let urlHasCredentials = false;
