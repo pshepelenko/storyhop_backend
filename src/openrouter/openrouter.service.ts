@@ -57,8 +57,8 @@ export class OpenRouterService {
     private readonly logger: FileLogger,
     private readonly prompts: PromptsService,
   ) {
-    const chatModel = process.env.OPENROUTER_STORY_MODEL || 'deepseek/deepseek-v4-flash';
-    const seasonModel = process.env.OPENROUTER_SEASON_MODEL || 'deepseek/deepseek-v4-pro';
+    const chatModel = process.env.OPENROUTER_STORY_MODEL || 'deepseek/deepseek-v4-flash-0731:nitro';
+    const seasonModel = process.env.OPENROUTER_SEASON_MODEL || 'deepseek/deepseek-v4-pro-0813';
     const storyProviderOrder = this.parseProviderOrder(
       process.env.OPENROUTER_STORY_PROVIDER_ORDER,
       chatModel,

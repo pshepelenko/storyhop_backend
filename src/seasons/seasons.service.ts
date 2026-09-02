@@ -1982,14 +1982,20 @@ export class SeasonsService {
     });
   }
 
-  private mapEpisodeForResponse(episode: Episode) {
+  private mapEpisodeForResponse(episode: Episode, completedSpeakingPhraseKeys: ReadonlySet<string> = new Set()) {
+    const speakingPrompt = episode.speakingPrompt || '';
     return {
       episodeId: episode.episodeId,
       episodeNumber: episode.episodeNumber,
       miniArcNumber: episode.miniArcNumber,
       title: episode.title,
       chapterText: episode.chapterText,
-      speakingPrompt: episode.speakingPrompt || '',
+      speakingPrompt,
+      speaking: {
+        completed:
+          Boolean(speakingPrompt) &&
+          completedSpeakingPhraseKeys.has(this.normalizeSpeakingPhraseKey(speakingPrompt)),
+      },
       introOptionsPhrase: episode.introOptionsPhrase,
       highlightedVocabulary: this.mapVocabularyForResponse(episode.highlightedVocabulary),
       choices: this.mapChoicesForResponse(episode.choices),
@@ -2011,11 +2017,24 @@ export class SeasonsService {
   }
 
   private getSpeakingPromptCandidates(chapterText: string): string[] {
-    const candidates = Array.from(chapterText.matchAll(/(?:"([^"\n]+)"|“([^”\n]+)”)/g))
-      .map((match) => (match[1] || match[2] || '').replace(/\s+/g, ' ').trim())
+    const quotedCandidates = [
+      ...Array.from(chapterText.matchAll(/(?:"([^"\n]+)"|“([^”\n]+)”)/g)).map((match) => ({
+        index: match.index || 0,
+        text: match[1] || match[2] || '',
+      })),
+      // Straight apostrophes are also used as dialogue quotes in generated English.
+      // Require punctuation/whitespace around them so contractions such as "don't"
+      // cannot become malformed candidate phrases.
+      ...Array.from(chapterText.matchAll(/(?:^|[\s([{:;—-])'([^'\n]+)'(?=$|[\s)\]}.!?;,:])/gm)).map((match) => ({
+        index: match.index || 0,
+        text: match[1] || '',
+      })),
+    ]
+      .sort((left, right) => left.index - right.index)
+      .map((candidate) => candidate.text.replace(/\s+/g, ' ').trim())
       .filter((candidate) => this.isValidSpeakingPrompt(candidate));
     const seen = new Set<string>();
-    return candidates.filter((candidate) => {
+    return quotedCandidates.filter((candidate) => {
       const key = this.normalizeSpeakingPhraseKey(candidate);
       if (!key || seen.has(key)) {
         return false;
@@ -2111,6 +2130,7 @@ export class SeasonsService {
     seasonId: string,
     episodeContent: Record<string, any>,
     excludedPreparedEpisodeId?: string,
+    allowMissingSpeakingPrompt = false,
   ): Promise<Record<string, any>> {
     const usedPhrases = await this.getUsedSpeakingPhrases(seasonId, excludedPreparedEpisodeId);
     const usedPhraseKeys = new Set(usedPhrases.map((phrase) => this.normalizeSpeakingPhraseKey(phrase)));
@@ -2121,6 +2141,16 @@ export class SeasonsService {
     );
 
     if (!speakingPrompt) {
+      if (allowMissingSpeakingPrompt) {
+        this.logger.warn(
+          `[Speaking] Prepared episode has no valid unique prompt; continuing without inline Speaking for season ${seasonId}`,
+        );
+        return {
+          ...episodeContent,
+          speakingPrompt: '',
+          speakingPhraseKey: '',
+        };
+      }
       throw new Error(`No unique speaking phrase available for season ${seasonId}`);
     }
 
@@ -2275,6 +2305,19 @@ export class SeasonsService {
       order: { createdAt: 'ASC' },
       select: ['choiceRecordId', 'episodeId', 'episodeNumber', 'choiceId', 'createdAt'],
     });
+    const completedSpeakingLedger = await this.crystalLedgerRepository.find({
+      where: {
+        ownerUserId: season.ownerUserId,
+        seasonId,
+        reason: In(['voice_attempt', 'bonus_speaking']),
+      },
+      select: ['metadata'],
+    });
+    const completedSpeakingPhraseKeys = new Set(
+      completedSpeakingLedger
+        .map((entry) => this.normalizeSpeakingPhraseKey(String(entry.metadata?.targetPhrase || '')))
+        .filter(Boolean),
+    );
     const crystalWallet = await this.getOrCreateCrystalWallet(season.ownerUserId, seasonId);
 
     const storybookEntries = focusEpisodeId
@@ -2331,7 +2374,7 @@ export class SeasonsService {
 
     const episodesForResponse = [];
     if (focusEpisode) {
-      episodesForResponse.push(this.mapEpisodeForResponse(focusEpisode));
+      episodesForResponse.push(this.mapEpisodeForResponse(focusEpisode, completedSpeakingPhraseKeys));
     }
     if (
       currentEpisode &&
@@ -2339,7 +2382,7 @@ export class SeasonsService {
       (!focusEpisode || currentEpisode.episodeId !== focusEpisode.episodeId)
     ) {
       // Keep current episode available for "continue" / hasNext without all history.
-      episodesForResponse.push(this.mapEpisodeForResponse(currentEpisode));
+      episodesForResponse.push(this.mapEpisodeForResponse(currentEpisode, completedSpeakingPhraseKeys));
     } else if (
       currentEpisode &&
       focusEpisode &&
@@ -2353,6 +2396,7 @@ export class SeasonsService {
         title: currentEpisode.title,
         chapterText: '',
         speakingPrompt: '',
+        speaking: { completed: false },
         introOptionsPhrase: '',
         highlightedVocabulary: [],
         choices: [],
@@ -2410,7 +2454,7 @@ export class SeasonsService {
       currentEpisode: currentEpisode
         ? focusEpisodeNumber === season.currentEpisodeNumber ||
           focusEpisode?.episodeId === currentEpisode.episodeId
-          ? this.mapEpisodeForResponse(currentEpisode)
+          ? this.mapEpisodeForResponse(currentEpisode, completedSpeakingPhraseKeys)
           : {
               episodeId: currentEpisode.episodeId,
               episodeNumber: currentEpisode.episodeNumber,
@@ -2418,6 +2462,7 @@ export class SeasonsService {
               title: currentEpisode.title,
               chapterText: '',
               speakingPrompt: '',
+              speaking: { completed: false },
               introOptionsPhrase: '',
               highlightedVocabulary: [],
               choices: [],
@@ -4321,6 +4366,7 @@ export class SeasonsService {
       favorited,
       favoritedAt,
       imageUrl: mappedImageUrl,
+      illustrationFailure: entry.metadata?.illustrationFailure || null,
       metadata: entry.metadata,
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
@@ -4405,6 +4451,10 @@ export class SeasonsService {
       }
 
       existingEntry.status = 'queued';
+      existingEntry.metadata = {
+        ...(existingEntry.metadata || {}),
+        illustrationFailure: null,
+      };
       existingEntry.updatedAt = now;
       await this.storybookEntriesRepository.save(existingEntry);
       if (preparedIllustrationInProgress) {
@@ -5238,7 +5288,11 @@ The image should make ${childName}'s season feel personal, magical, and immediat
     if (activeJob) {
       return activeJob;
     }
-    if (jobHistory.length && !this.canScheduleRetry(jobHistory)) {
+    const latestJob = jobHistory[0];
+    // A retry after a visible illustration failure is an explicit user action.
+    // It starts a fresh lifecycle instead of inheriting an expired job's TTL.
+    const canStartFreshIllustrationRun = ['failed', 'expired'].includes(String(latestJob?.status || ''));
+    if (jobHistory.length && !canStartFreshIllustrationRun && !this.canScheduleRetry(jobHistory)) {
       return jobHistory[0];
     }
 
@@ -5251,6 +5305,10 @@ The image should make ${childName}'s season feel personal, magical, and immediat
     const entry = await this.storybookEntriesRepository.findOne({ where: { storybookEntryId } });
     if (entry && entry.status !== 'ready') {
       entry.status = 'queued';
+      entry.metadata = {
+        ...(entry.metadata || {}),
+        illustrationFailure: null,
+      };
       entry.updatedAt = new Date();
       await this.storybookEntriesRepository.save(entry);
     }
@@ -6376,6 +6434,7 @@ The image must be suitable as a visual consistency reference for future story il
       seasonId,
       this.normalizeEpisodeContent(episodeContent, outlineItem),
       excludedPreparedEpisodeId,
+      Boolean(excludedPreparedEpisodeId),
     );
     const episodeId = uuidv4();
     const now = new Date();
@@ -6840,31 +6899,15 @@ The image must be suitable as a visual consistency reference for future story il
       const payload = job.payload || {};
       const illustrationId = String(payload.illustrationId || '');
       const storybookEntryId = String(payload.storybookEntryId || '');
-      const illustration = illustrationId
-        ? await this.illustrationsRepository.findOne({ where: { illustrationId } })
-        : null;
-      const entry = storybookEntryId
-        ? await this.storybookEntriesRepository.findOne({ where: { storybookEntryId } })
-        : null;
-
-      if (illustration) {
-        illustration.status = 'failed';
-        illustration.promptPayload = {
-          ...(illustration.promptPayload || {}),
-          providerRequestId: illustration.promptPayload?.providerRequestId || null,
-        };
-        illustration.updatedAt = new Date();
-        await this.illustrationsRepository.save(illustration);
-      }
-
-      if (entry) {
-        entry.status = 'failed';
-        entry.updatedAt = new Date();
-        await this.storybookEntriesRepository.save(entry);
-      }
-
       if (illustrationId || job.episodeId) {
-        await this.refundIllustrationUnlockIfNeeded(job, illustrationId, job.episodeId || null);
+        await this.failIllustrationUnlock({
+          seasonId: job.seasonId,
+          episodeId: job.episodeId || null,
+          illustrationId,
+          storybookEntryId,
+          failedJobId: job.jobId,
+          failureCode: 'generation_failed',
+        });
       }
 
       job.status = 'failed';
@@ -8794,6 +8837,16 @@ Requirements:
       job.error = `Generation job expired after ${Math.round(GENERATION_JOB_MAX_AGE_MS / 60000)} minutes`;
       job.updatedAt = new Date();
       await this.generationJobsRepository.save(job);
+      if (job.jobType === 'image_generation') {
+        await this.failIllustrationUnlock({
+          seasonId: job.seasonId,
+          episodeId: job.episodeId || null,
+          illustrationId: String(job.payload?.illustrationId || ''),
+          storybookEntryId: String(job.payload?.storybookEntryId || ''),
+          failedJobId: job.jobId,
+          failureCode: 'generation_timeout',
+        });
+      }
       expired += 1;
       this.logger.warn(
         `[Worker] Expired job jobId=${job.jobId} jobType=${job.jobType} seasonId=${job.seasonId}`,
@@ -9342,36 +9395,39 @@ Requirements:
   }
 
   private async refundIllustrationUnlockIfNeeded(
-    job: GenerationJob,
-    illustrationId: string,
-    episodeId: string | null,
-  ) {
-    const season = await this.seasonsRepository.findOne({ where: { seasonId: job.seasonId } });
+    input: {
+      seasonId: string;
+      illustrationId: string;
+      episodeId: string | null;
+      failedJobId?: string | null;
+    },
+  ): Promise<number> {
+    const season = await this.seasonsRepository.findOne({ where: { seasonId: input.seasonId } });
     if (!season?.ownerUserId) {
-      return;
+      return 0;
     }
 
-    const targetEpisodeId = episodeId || job.episodeId || null;
+    const targetEpisodeId = input.episodeId || null;
     const debitEntries = await this.crystalLedgerRepository.find({
       where: {
-        seasonId: job.seasonId,
+        seasonId: input.seasonId,
         ownerUserId: season.ownerUserId,
         reason: 'illustration_unlock',
       },
       order: { createdAt: 'DESC' },
     });
     const debitEntry =
-      debitEntries.find((entry) => illustrationId && entry.metadata?.illustrationId === illustrationId) ||
+      debitEntries.find((entry) => input.illustrationId && entry.metadata?.illustrationId === input.illustrationId) ||
       (targetEpisodeId
         ? debitEntries.find((entry) => entry.metadata?.episodeId === targetEpisodeId)
         : null);
     if (!debitEntry) {
-      return;
+      return 0;
     }
 
     const refundEntries = await this.crystalLedgerRepository.find({
       where: {
-        seasonId: job.seasonId,
+        seasonId: input.seasonId,
         ownerUserId: season.ownerUserId,
         reason: 'illustration_unlock_refund',
       },
@@ -9380,13 +9436,13 @@ Requirements:
       refundEntries.some(
         (entry) =>
           entry.metadata?.sourceLedgerEntryId === debitEntry.ledgerEntryId ||
-          (illustrationId && entry.metadata?.illustrationId === illustrationId) ||
+          (input.illustrationId && entry.metadata?.illustrationId === input.illustrationId) ||
           (targetEpisodeId &&
             entry.metadata?.episodeId === targetEpisodeId &&
             entry.metadata?.sourceLedgerEntryId === debitEntry.ledgerEntryId),
       )
     ) {
-      return;
+      return 0;
     }
 
     await this.crystalLedgerRepository.save(
@@ -9394,29 +9450,138 @@ Requirements:
         ledgerEntryId: uuidv4(),
         walletId: debitEntry.walletId,
         ownerUserId: season.ownerUserId,
-        seasonId: job.seasonId,
+        seasonId: input.seasonId,
         direction: 'credit',
         amount: debitEntry.amount,
         reason: 'illustration_unlock_refund',
         metadata: {
-          illustrationId: debitEntry.metadata?.illustrationId || illustrationId || null,
+          illustrationId: debitEntry.metadata?.illustrationId || input.illustrationId || null,
           episodeId: targetEpisodeId || debitEntry.metadata?.episodeId || null,
           episodeNumber: debitEntry.metadata?.episodeNumber || null,
           sourceLedgerEntryId: debitEntry.ledgerEntryId,
-          failedJobId: job.jobId,
+          failedJobId: input.failedJobId || null,
         },
         createdAt: new Date(),
       }),
     );
 
-    await this.getOrCreateCrystalWallet(season.ownerUserId, job.seasonId);
+    await this.getOrCreateCrystalWallet(season.ownerUserId, input.seasonId);
     this.logPipelineStep('illustration_unlock_refunded', {
-      seasonId: job.seasonId,
+      seasonId: input.seasonId,
       episodeId: targetEpisodeId || debitEntry.metadata?.episodeId || null,
-      illustrationId: debitEntry.metadata?.illustrationId || illustrationId || null,
+      illustrationId: debitEntry.metadata?.illustrationId || input.illustrationId || null,
       amount: debitEntry.amount,
-      failedJobId: job.jobId,
+      failedJobId: input.failedJobId || null,
     });
+    return debitEntry.amount;
+  }
+
+  private async failIllustrationUnlock(input: {
+    seasonId: string;
+    episodeId: string | null;
+    illustrationId: string;
+    storybookEntryId: string;
+    failedJobId?: string | null;
+    failureCode: 'generation_failed' | 'generation_timeout' | 'missing_generation_job';
+  }): Promise<number> {
+    const illustration = input.illustrationId
+      ? await this.illustrationsRepository.findOne({ where: { illustrationId: input.illustrationId } })
+      : null;
+    const entry = input.storybookEntryId
+      ? await this.storybookEntriesRepository.findOne({ where: { storybookEntryId: input.storybookEntryId } })
+      : null;
+    const now = new Date();
+
+    if (illustration && !['ready', 'ready_dry_run'].includes(illustration.status)) {
+      illustration.status = 'failed';
+      illustration.updatedAt = now;
+      await this.illustrationsRepository.save(illustration);
+    }
+
+    const refundedCrystals = await this.refundIllustrationUnlockIfNeeded({
+      seasonId: input.seasonId,
+      illustrationId: illustration?.illustrationId || input.illustrationId,
+      episodeId: input.episodeId || illustration?.episodeId || entry?.episodeId || null,
+      failedJobId: input.failedJobId || null,
+    });
+
+    if (entry && !['ready', 'ready_dry_run'].includes(entry.status)) {
+      entry.status = 'failed';
+      entry.metadata = {
+        ...(entry.metadata || {}),
+        illustrationFailure: {
+          code: input.failureCode,
+          failedAt: now.toISOString(),
+          refundedCrystals,
+        },
+      };
+      entry.updatedAt = now;
+      await this.storybookEntriesRepository.save(entry);
+    }
+
+    this.logPipelineStep('illustration_unlock_failed', {
+      seasonId: input.seasonId,
+      episodeId: input.episodeId || illustration?.episodeId || entry?.episodeId || null,
+      illustrationId: illustration?.illustrationId || input.illustrationId || null,
+      storybookEntryId: entry?.storybookEntryId || input.storybookEntryId || null,
+      failureCode: input.failureCode,
+      refundedCrystals,
+      failedJobId: input.failedJobId || null,
+    });
+    return refundedCrystals;
+  }
+
+  async reconcileStaleIllustrationUnlocks(): Promise<number> {
+    const staleBefore = new Date(Date.now() - GENERATION_JOB_MAX_AGE_MS);
+    const entries = await this.storybookEntriesRepository.find({
+      where: {
+        entryType: 'episode_illustration',
+        status: In(['queued', 'processing']),
+      },
+      order: { updatedAt: 'ASC' },
+    });
+    let reconciled = 0;
+
+    for (const entry of entries) {
+      if (
+        !entry.updatedAt ||
+        entry.updatedAt > staleBefore ||
+        !entry.illustrationId
+      ) {
+        continue;
+      }
+      const illustration = await this.illustrationsRepository.findOne({
+        where: { illustrationId: entry.illustrationId },
+      });
+      if (
+        !illustration ||
+        illustration.updatedAt > staleBefore ||
+        illustration.imageUrl ||
+        ['ready', 'ready_dry_run'].includes(illustration.status)
+      ) {
+        continue;
+      }
+      const hasActiveJob = entry.episodeId
+        ? await this.isIllustrationJobInProgress(entry.seasonId, entry.episodeId)
+        : false;
+      if (hasActiveJob) {
+        continue;
+      }
+
+      await this.failIllustrationUnlock({
+        seasonId: entry.seasonId,
+        episodeId: entry.episodeId,
+        illustrationId: illustration.illustrationId,
+        storybookEntryId: entry.storybookEntryId,
+        failureCode: 'missing_generation_job',
+      });
+      reconciled += 1;
+      this.logger.warn(
+        `[Worker] Reconciled stale illustration without active job seasonId=${entry.seasonId} storybookEntryId=${entry.storybookEntryId}`,
+      );
+    }
+
+    return reconciled;
   }
 
   private buildDryRunAudioUrl(chunkId: string) {

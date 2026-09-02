@@ -8,13 +8,14 @@ export class WorkerService {
 
   constructor(private readonly seasonsService: SeasonsService) {}
 
-  async processAllPendingJobs(): Promise<{ processed: number }> {
+  async processAllPendingJobs(): Promise<{ processed: number; reconciled: number }> {
     if (this.running) {
-      return { processed: 0 };
+      return { processed: 0, reconciled: 0 };
     }
     this.running = true;
 
     try {
+      const reconciled = await this.seasonsService.reconcileStaleIllustrationUnlocks();
       const seasons = await this.seasonsService.getAllSeasonsForProcessing();
       let processed = 0;
 
@@ -27,7 +28,7 @@ export class WorkerService {
         }
       }
 
-      return { processed };
+      return { processed, reconciled };
     } finally {
       this.running = false;
     }
