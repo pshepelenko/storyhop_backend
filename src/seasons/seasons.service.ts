@@ -2035,7 +2035,17 @@ export class SeasonsService {
     const incompleteBoundaryWords = new Set([
       'a', 'an', 'and', 'at', 'because', 'but', 'for', 'from', 'if', 'in', 'into', 'of', 'on', 'or', 'so', 'the', 'then', 'to', 'with', 'when',
     ]);
-    return !incompleteBoundaryWords.has(words[0]) && !incompleteBoundaryWords.has(words[words.length - 1]);
+    if (incompleteBoundaryWords.has(words[0]) || incompleteBoundaryWords.has(words[words.length - 1])) {
+      return false;
+    }
+
+    // New exercises should not rely on phonetic transcription of story names.
+    // Existing selected phrases remain immutable.
+    if (/^[A-Z][a-z]+[,!]\s/.test(normalized) || /^[A-Z][a-z]+\s+(says|asks|cries|shouts)\b/.test(normalized)) {
+      return false;
+    }
+    const sourceWords = normalized.split(/\s+/);
+    return !sourceWords.slice(1).some((word) => /^[A-Z][a-z]{2,}[,.!?]?$/.test(word));
   }
 
   private pickUniqueSpeakingPrompt(
@@ -2601,7 +2611,7 @@ export class SeasonsService {
       await this.recordLearningEvent(seasonId, {
         episodeId: episode?.episodeId || null,
         eventType: 'voice_attempt',
-        payload: { targetPhrase, transcript: transcript.slice(0, 200), matched: false, origin: payload.origin || 'story' },
+        payload: { targetPhrase, matched: false, origin: payload.origin || 'story' },
       });
       return {
         success: false,
@@ -2635,7 +2645,6 @@ export class SeasonsService {
     await this.creditCrystals(season.ownerUserId, seasonId, 1, 'bonus_speaking', {
       episodeId,
       targetPhrase,
-      transcript: transcript.slice(0, 200),
       itemId: queueItem?.itemId || null,
       origin: payload.origin || 'story',
     });
@@ -4563,7 +4572,6 @@ export class SeasonsService {
     await this.creditCrystals(season.ownerUserId, seasonId, 1, 'voice_attempt', {
       episodeId,
       targetPhrase,
-      transcript: transcript.slice(0, 200),
     });
 
     await this.recordLearningEvent(seasonId, {

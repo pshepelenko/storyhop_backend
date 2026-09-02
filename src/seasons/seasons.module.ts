@@ -21,6 +21,7 @@ import { LearningEvent } from './entities/learning-event.entity';
 import { ProgressController } from './progress.controller';
 import { ChildProfile } from '../users/entities/child-profile.entity';
 import { SeasonDraft } from './entities/season-draft.entity';
+import { SpeakingTranscriptionService } from './speaking-transcription.service';
 
 @Module({
   imports: [
@@ -44,7 +45,7 @@ import { SeasonDraft } from './entities/season-draft.entity';
     ]),
   ],
   controllers: [SeasonsController, ProgressController],
-  providers: [SeasonsService, SeasonCharactersService, TtiPromptService],
+  providers: [SeasonsService, SeasonCharactersService, TtiPromptService, SpeakingTranscriptionService],
   exports: [SeasonsService],
 })
 export class SeasonsModule {}

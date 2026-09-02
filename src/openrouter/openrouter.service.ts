@@ -10,6 +10,8 @@ export interface OpenRouterConfig {
   seasonReasoningEffort: string;
   ttsModel: string;
   ttsVoice: string;
+  sttModel: string;
+  sttFallbackModel: string;
   imageModel: string;
   imageAspectRatio: string;
   imageQuality: string;
@@ -21,6 +23,14 @@ export interface OpenRouterConfig {
   seasonProviderOrder: string[];
   seasonProviderSort: string;
   seasonProviderAllowFallbacks: boolean;
+}
+
+export interface OpenRouterTranscriptionResult {
+  transcript: string;
+  model: string;
+  requestId: string | null;
+  durationSeconds: number | null;
+  costUsd: number | null;
 }
 
 export interface OpenRouterImageGenerationResult {
@@ -67,6 +77,8 @@ export class OpenRouterService {
       seasonReasoningEffort: process.env.OPENROUTER_SEASON_REASONING || 'medium',
       ttsModel: process.env.OPENROUTER_TTS_MODEL || 'hexgrad/kokoro-82m',
       ttsVoice: process.env.OPENROUTER_TTS_VOICE || 'bm_lewis',
+      sttModel: process.env.OPENROUTER_STT_MODEL || 'mistralai/voxtral-small-24b-2507-stt',
+      sttFallbackModel: process.env.OPENROUTER_STT_FALLBACK_MODEL || 'openai/gpt-transcribe',
       imageModel: process.env.OPENROUTER_IMAGE_MODEL || 'openai/gpt-image-2',
       imageAspectRatio: process.env.OPENROUTER_IMAGE_ASPECT_RATIO || '3:2',
       imageQuality: process.env.OPENROUTER_IMAGE_QUALITY || 'low',
@@ -206,6 +218,14 @@ export class OpenRouterService {
 
   getTtsVoice(): string {
     return this.config.ttsVoice;
+  }
+
+  getSttModel(): string {
+    return this.config.sttModel;
+  }
+
+  getSttFallbackModel(): string {
+    return this.config.sttFallbackModel;
   }
 
   getImageModel(): string {
@@ -448,6 +468,70 @@ export class OpenRouterService {
     }
   }
 
+  async transcribeAudio(audio: Buffer, format: 'm4a' | 'mp3' | 'webm'): Promise<OpenRouterTranscriptionResult> {
+    try {
+      return await this.requestTranscription(this.config.sttModel, audio, format);
+    } catch (primaryError) {
+      this.logger.logOpenRouterError(`transcribeAudio [${this.config.sttModel}] primary`, primaryError);
+      if (!this.shouldFallbackTranscription(primaryError)) {
+        throw primaryError;
+      }
+      try {
+        return await this.requestTranscription(this.config.sttFallbackModel, audio, format);
+      } catch (fallbackError) {
+        this.logger.logOpenRouterError(`transcribeAudio [${this.config.sttFallbackModel}] fallback`, fallbackError);
+        throw fallbackError;
+      }
+    }
+  }
+
+  private shouldFallbackTranscription(error: unknown): boolean {
+    const status = Number((error as { response?: { status?: number } } | null)?.response?.status || 0);
+    return !status || status === 429 || status >= 500;
+  }
+
+  private async requestTranscription(
+    model: string,
+    audio: Buffer,
+    format: 'm4a' | 'mp3' | 'webm',
+  ): Promise<OpenRouterTranscriptionResult> {
+    try {
+      const response = await axios.post(
+        'https://openrouter.ai/api/v1/audio/transcriptions',
+        {
+          model,
+          input_audio: {
+            data: audio.toString('base64'),
+            format,
+          },
+          language: 'en',
+          temperature: 0,
+        },
+        { headers: this.authHeaders(), timeout: 15000 },
+      );
+
+      const transcript = String(response.data?.text || '').trim();
+      if (!transcript) {
+        throw new Error('OpenRouter transcription response did not include text');
+      }
+
+      const requestId = String(
+        response.headers?.['x-generation-id'] || response.headers?.['x-request-id'] || response.headers?.['request-id'] || '',
+      ).trim() || null;
+      const durationSeconds = Number(response.data?.usage?.seconds);
+      const costUsd = Number(response.data?.usage?.cost);
+      return {
+        transcript,
+        model,
+        requestId,
+        durationSeconds: Number.isFinite(durationSeconds) ? durationSeconds : null,
+        costUsd: Number.isFinite(costUsd) ? costUsd : null,
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
   async checkModelsHealth(): Promise<{ model: string; available: boolean; error?: string }[]> {
     const results: { model: string; available: boolean; error?: string }[] = [];
 
@@ -456,12 +540,19 @@ export class OpenRouterService {
       this.config.seasonModel,
       this.config.seasonFallbackModel,
       this.config.ttsModel,
+      this.config.sttModel,
+      this.config.sttFallbackModel,
       this.config.imageModel,
     ].filter((model, index, list) => Boolean(model) && list.indexOf(model) === index);
 
     for (const model of modelsToCheck) {
       try {
-        if (model === this.config.imageModel || model === this.config.ttsModel) {
+        if (
+          model === this.config.imageModel ||
+          model === this.config.ttsModel ||
+          model === this.config.sttModel ||
+          model === this.config.sttFallbackModel
+        ) {
           await axios.get(
             `https://openrouter.ai/api/v1/models/${encodeURIComponent(model)}/endpoints`,
             { headers: this.authHeaders(), timeout: 15000 },

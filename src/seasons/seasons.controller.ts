@@ -1,15 +1,20 @@
-import { BadRequestException, Body, Controller, Get, HttpException, HttpStatus, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpException, HttpStatus, Param, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { SeasonsService } from './seasons.service';
 import { CurrentUser } from '../users/current-user.decorator';
 import { User } from '../users/entities/user.entity';
 import { SeasonOwnerGuard } from '../users/season-owner.guard';
 import { SessionAuthGuard } from '../users/session-auth.guard';
 import { assertMaintenanceRouteEnabled } from '../security/maintenance-route';
+import { SpeakingTranscriptionService } from './speaking-transcription.service';
 
 @Controller('seasons')
 @UseGuards(SessionAuthGuard, SeasonOwnerGuard)
 export class SeasonsController {
-  constructor(private readonly seasonsService: SeasonsService) {}
+  constructor(
+    private readonly seasonsService: SeasonsService,
+    private readonly speakingTranscription: SpeakingTranscriptionService,
+  ) {}
 
   @Post('hero-preview')
   async previewHero(
@@ -194,6 +199,18 @@ export class SeasonsController {
       console.error('Submit speaking practice failed', error);
       throw new HttpException(error?.message || 'Submit speaking practice failed', HttpStatus.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  @Post(':seasonId/bonus-practice/speaking/transcribe')
+  @UseInterceptors(FileInterceptor('audio', {
+    limits: { fileSize: 256 * 1024, files: 1 },
+  }))
+  async transcribeSpeakingAudio(
+    @CurrentUser() user: User,
+    @UploadedFile() audio: { buffer: Buffer; size: number; mimetype: string } | undefined,
+    @Body() body: { durationMs?: string },
+  ) {
+    return this.speakingTranscription.transcribe(user.userId, audio, Number(body?.durationMs));
   }
 
   @Post(':seasonId/bonus-practice/speaking/skip')

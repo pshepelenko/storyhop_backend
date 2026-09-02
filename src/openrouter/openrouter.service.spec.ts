@@ -75,4 +75,40 @@ describe('OpenRouterService image generation', () => {
       expect.objectContaining({ timeout: 15000 }),
     );
   });
+
+  it('uses GPT Transcribe once when the approved Voxtral primary model fails', async () => {
+    process.env.OPENROUTER_STT_MODEL = 'mistralai/voxtral-small-24b-2507-stt';
+    process.env.OPENROUTER_STT_FALLBACK_MODEL = 'openai/gpt-transcribe';
+    mockedAxios.post
+      .mockRejectedValueOnce(Object.assign(new Error('primary unavailable'), { response: { status: 503 } }))
+      .mockResolvedValueOnce({
+        data: { text: 'The boat is ready.', usage: { seconds: 2.5, cost: 0.0002 } },
+        headers: { 'x-generation-id': 'fallback-request-123' },
+      } as any);
+    const service = new OpenRouterService(logger as any, prompts as any);
+
+    await expect(service.transcribeAudio(Buffer.from('voice'), 'm4a')).resolves.toEqual({
+      transcript: 'The boat is ready.',
+      model: 'openai/gpt-transcribe',
+      requestId: 'fallback-request-123',
+      durationSeconds: 2.5,
+      costUsd: 0.0002,
+    });
+    expect(mockedAxios.post).toHaveBeenNthCalledWith(
+      1,
+      'https://openrouter.ai/api/v1/audio/transcriptions',
+      expect.objectContaining({ model: 'mistralai/voxtral-small-24b-2507-stt' }),
+      expect.any(Object),
+    );
+    expect(mockedAxios.post).toHaveBeenNthCalledWith(
+      2,
+      'https://openrouter.ai/api/v1/audio/transcriptions',
+      expect.objectContaining({ model: 'openai/gpt-transcribe' }),
+      expect.any(Object),
+    );
+    expect(logger.logOpenRouterError).toHaveBeenCalledWith(
+      expect.stringContaining('primary'),
+      expect.any(Error),
+    );
+  });
 });

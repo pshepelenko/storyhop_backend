@@ -30,7 +30,7 @@ Backend runs on `http://localhost:3000` by default.
 
 ## Environment
 
-Local development may use `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, and `DB_NAME`. Railway uses `DATABASE_URL`. Also configure `OPEN_ROUTER_API_KEY`, Pixazo, R2 credentials/bucket, `FRONTEND_URL=https://app.story-hop.com`, `BACKEND_URL=https://api.story-hop.com`, `ALLOWED_ORIGINS=https://app.story-hop.com`, `SESSION_COOKIE_DOMAIN=.story-hop.com`, `HEALTH_DIAGNOSTICS_TOKEN`, and `WORKER_ENABLED=true`. Production startup validates these values and rejects `DB_SYNCHRONIZE=true`.
+Local development may use `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, and `DB_NAME`. Railway uses `DATABASE_URL`. Also configure `OPEN_ROUTER_API_KEY`, Pixazo, R2 credentials/bucket, `FRONTEND_URL=https://app.story-hop.com`, `BACKEND_URL=https://api.story-hop.com`, `ALLOWED_ORIGINS=https://app.story-hop.com`, `SESSION_COOKIE_DOMAIN=.story-hop.com`, `HEALTH_DIAGNOSTICS_TOKEN`, and `WORKER_ENABLED=true`. Speaking transcription defaults to `OPENROUTER_STT_MODEL=mistralai/voxtral-small-24b-2507-stt` and uses `OPENROUTER_STT_FALLBACK_MODEL=openai/gpt-transcribe` only for an unavailable or invalid primary response. Production startup validates these values and rejects `DB_SYNCHRONIZE=true`.
 
 ## Deploy
 
