@@ -99,6 +99,41 @@ const BONUS_STORY_RECAP_COOLDOWN_EPISODES = 10;
 const WRITING_PRACTICE_WORD_COUNT = 4;
 const WRITING_PRACTICE_COOLDOWN_EPISODES = 5;
 
+type ActiveGenerationJobForWorker = Pick<GenerationJob, 'seasonId' | 'jobType' | 'createdAt'>;
+
+/**
+ * A worker pass is driven by queued work, not the age/status of a season.
+ * Live media stays ahead of prefetch so a newly unlocked scene reaches Pixazo.
+ */
+export const orderSeasonIdsForWorker = (jobs: ActiveGenerationJobForWorker[]): string[] => {
+  const liveJobTypes = new Set(['tts_chunk', 'image_generation']);
+  const firstJobBySeason = new Map<string, ActiveGenerationJobForWorker>();
+
+  for (const job of jobs) {
+    const existing = firstJobBySeason.get(job.seasonId);
+    if (!existing) {
+      firstJobBySeason.set(job.seasonId, job);
+      continue;
+    }
+    const existingIsLive = liveJobTypes.has(existing.jobType);
+    const candidateIsLive = liveJobTypes.has(job.jobType);
+    if (
+      (candidateIsLive && !existingIsLive) ||
+      (candidateIsLive === existingIsLive && job.createdAt.getTime() < existing.createdAt.getTime())
+    ) {
+      firstJobBySeason.set(job.seasonId, job);
+    }
+  }
+
+  return [...firstJobBySeason.values()]
+    .sort((left, right) => {
+      const leftPriority = liveJobTypes.has(left.jobType) ? 0 : 1;
+      const rightPriority = liveJobTypes.has(right.jobType) ? 0 : 1;
+      return leftPriority - rightPriority || left.createdAt.getTime() - right.createdAt.getTime();
+    })
+    .map((job) => job.seasonId);
+};
+
 type BonusPracticeOrigin = 'story' | 'home';
 type BonusPracticeType = 'speaking_single' | 'speaking_recap' | 'spelling_test';
 
@@ -2394,6 +2429,7 @@ export class SeasonsService {
       episodes: episodesForResponse,
       generationJobs: relevantJobs.map((job) => ({
         jobId: job.jobId,
+        episodeId: job.episodeId || job.payload?.episodeId || null,
         jobType: job.jobType,
         status: job.status,
         payload: {
@@ -3430,19 +3466,16 @@ export class SeasonsService {
   }
 
   async getAllSeasonsForProcessing(): Promise<string[]> {
-    const seasons = await this.seasonsRepository.find({
-      where: { status: 'episode_ready' },
-      select: ['seasonId'],
-      order: { updatedAt: 'ASC' },
-      take: 50,
+    const jobs = await this.generationJobsRepository.find({
+      where: [
+        { status: 'pending' },
+        { status: 'processing' },
+      ],
+      select: ['seasonId', 'jobType', 'createdAt'],
+      order: { createdAt: 'ASC' },
     });
-    const titleJobSeasons = await this.generationJobsRepository
-      .createQueryBuilder('job')
-      .select('job.seasonId', 'seasonId')
-      .where('job.jobType = :jobType', { jobType: 'season_title' })
-      .andWhere('job.status = :status', { status: 'pending' })
-      .getRawMany<{ seasonId: string }>();
-    return Array.from(new Set([...seasons.map((s) => s.seasonId), ...titleJobSeasons.map((job) => job.seasonId)]));
+
+    return orderSeasonIdsForWorker(jobs);
   }
 
   private getPreparedEpisodeIdFromJob(job: GenerationJob): string {
@@ -5218,7 +5251,7 @@ The image should make ${childName}'s season feel personal, magical, and immediat
 
     const candidate = episode.illustrationCandidate || {};
     const now = new Date();
-    return this.generationJobsRepository.save(
+    const queuedJob = await this.generationJobsRepository.save(
       this.generationJobsRepository.create({
         jobId: uuidv4(),
         seasonId,
@@ -5245,6 +5278,16 @@ The image should make ${childName}'s season feel personal, magical, and immediat
         updatedAt: now,
       }),
     );
+    this.logPipelineStep('illustration_job_enqueued', {
+      seasonId,
+      jobId: queuedJob.jobId,
+      episodeId: episode.episodeId,
+      episodeNumber: episode.episodeNumber,
+      illustrationId,
+      storybookEntryId,
+      attempt: Number(queuedJob.payload?.lifecycle?.attempt || 1),
+    });
+    return queuedJob;
   }
 
   private async enqueuePreparedNextEpisodeJobs(
