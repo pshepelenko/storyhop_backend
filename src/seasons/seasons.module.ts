@@ -22,6 +22,7 @@ import { ProgressController } from './progress.controller';
 import { ChildProfile } from '../users/entities/child-profile.entity';
 import { SeasonDraft } from './entities/season-draft.entity';
 import { SpeakingTranscriptionService } from './speaking-transcription.service';
+import { SpeakingAudioNormalizerService } from './speaking-audio-normalizer.service';
 
 @Module({
   imports: [
@@ -45,7 +46,7 @@ import { SpeakingTranscriptionService } from './speaking-transcription.service';
     ]),
   ],
   controllers: [SeasonsController, ProgressController],
-  providers: [SeasonsService, SeasonCharactersService, TtiPromptService, SpeakingTranscriptionService],
+  providers: [SeasonsService, SeasonCharactersService, TtiPromptService, SpeakingAudioNormalizerService, SpeakingTranscriptionService],
   exports: [SeasonsService],
 })
 export class SeasonsModule {}

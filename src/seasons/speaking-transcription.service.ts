@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { FileLogger } from '../logging/file-logger.service';
 import { OpenRouterService } from '../openrouter/openrouter.service';
+import { SpeakingAudioNormalizerService } from './speaking-audio-normalizer.service';
 
 type UploadedAudio = {
   buffer: Buffer;
@@ -36,6 +37,7 @@ export class SpeakingTranscriptionService {
   constructor(
     private readonly openRouter: OpenRouterService,
     private readonly logger: FileLogger,
+    private readonly audioNormalizer: SpeakingAudioNormalizerService,
   ) {}
 
   async transcribe(ownerUserId: string, audio: UploadedAudio | undefined, durationMs?: number) {
@@ -46,24 +48,27 @@ export class SpeakingTranscriptionService {
       throw new PayloadTooLargeException('Speaking audio is too large');
     }
 
-    const format = FORMAT_BY_MIME[String(audio.mimetype || '').toLowerCase()];
+    const normalizedMimeType = String(audio.mimetype || '').toLowerCase().split(';', 1)[0].trim();
+    const format = FORMAT_BY_MIME[normalizedMimeType];
     if (!format) {
       throw new BadRequestException('Unsupported speaking audio format');
     }
 
     this.assertRateLimit(ownerUserId);
     const safeDurationMs = Math.min(Math.max(Number(durationMs) || 0, 0), 12000);
+    const inputSignature = this.audioNormalizer.describeContainer(audio.buffer);
 
     try {
-      const result = await this.openRouter.transcribeAudio(audio.buffer, format);
+      const normalizedAudio = await this.audioNormalizer.toMp3(audio.buffer);
+      const result = await this.openRouter.transcribeAudio(normalizedAudio, 'mp3');
       this.logger.log(
-        `[SpeakingSTT] completed model=${result.model} bytes=${audio.size} durationMs=${safeDurationMs} requestId=${result.requestId || 'none'} providerSeconds=${result.durationSeconds ?? 'none'} costUsd=${result.costUsd ?? 'none'}`,
+        `[SpeakingSTT] completed inputMime=${normalizedMimeType} inputFormat=${format} inputSignature=${inputSignature} inputBytes=${audio.size} normalizedFormat=mp3 normalizedBytes=${normalizedAudio.length} durationMs=${safeDurationMs} model=${result.model} requestId=${result.requestId || 'none'} providerSeconds=${result.durationSeconds ?? 'none'} costUsd=${result.costUsd ?? 'none'}`,
       );
       return { transcript: result.transcript };
     } catch (error: any) {
       const status = Number(error?.response?.status || 0);
       this.logger.warn(
-        `[SpeakingSTT] failed primary=${this.openRouter.getSttModel()} fallback=${this.openRouter.getSttFallbackModel()} bytes=${audio.size} durationMs=${safeDurationMs} status=${status || 'unknown'}`,
+        `[SpeakingSTT] failed inputMime=${normalizedMimeType} inputFormat=${format} inputSignature=${inputSignature} inputBytes=${audio.size} durationMs=${safeDurationMs} primary=${this.openRouter.getSttModel()} fallback=${this.openRouter.getSttFallbackModel()} status=${status || 'unknown'}`,
       );
       throw new ServiceUnavailableException('Speech transcription is temporarily unavailable');
     }
