@@ -103,7 +103,7 @@ type ActiveGenerationJobForWorker = Pick<GenerationJob, 'seasonId' | 'jobType' |
  * Live media stays ahead of prefetch so a newly unlocked scene reaches the image provider.
  */
 export const orderSeasonIdsForWorker = (jobs: ActiveGenerationJobForWorker[]): string[] => {
-  const liveJobTypes = new Set(['tts_chunk', 'image_generation']);
+  const liveJobTypes = new Set(['episode_choice_generation', 'tts_chunk', 'image_generation']);
   const firstJobBySeason = new Map<string, ActiveGenerationJobForWorker>();
 
   for (const job of jobs) {
@@ -2313,7 +2313,18 @@ export class SeasonsService {
           : {}),
       },
       order: { createdAt: 'ASC' },
-      select: ['choiceRecordId', 'episodeId', 'episodeNumber', 'choiceId', 'createdAt'],
+      select: [
+        'choiceRecordId',
+        'episodeId',
+        'episodeNumber',
+        'choiceId',
+        'generationStatus',
+        'generationJobId',
+        'targetEpisodeNumber',
+        'generationError',
+        'createdAt',
+        'updatedAt',
+      ],
     });
     const completedSpeakingLedger = await this.crystalLedgerRepository.find({
       where: {
@@ -2520,7 +2531,12 @@ export class SeasonsService {
         episodeId: choice.episodeId,
         episodeNumber: choice.episodeNumber,
         choiceId: choice.choiceId,
+        generationStatus: choice.generationStatus,
+        generationJobId: choice.generationJobId,
+        targetEpisodeNumber: choice.targetEpisodeNumber,
+        generationError: choice.generationError,
         createdAt: choice.createdAt,
+        updatedAt: choice.updatedAt,
       })),
       crystalWallet: {
         walletId: crystalWallet.walletId,
@@ -3220,7 +3236,12 @@ export class SeasonsService {
     return this.getSeason(seasonId);
   }
 
-  async applyEpisodeChoice(seasonId: string, episodeId: string, choiceId: string) {
+  async applyEpisodeChoice(
+    seasonId: string,
+    episodeId: string,
+    choiceId: string,
+    options: { fromGenerationJob?: boolean } = {},
+  ) {
     this.logPipelineStep('choice_apply_started', { seasonId, episodeId, choiceId });
 
     try {
@@ -3367,6 +3388,81 @@ export class SeasonsService {
           ) &&
           !canUsePreparedEpisode,
       );
+
+      // The reader must never keep an HTTP request open while prose is being
+      // generated. Persist the irreversible choice, then let the worker resume
+      // this method with the same choice and story state.
+      if (!options.fromGenerationJob) {
+        const now = new Date();
+        let queuedChoice = existingChoiceRecord;
+        if (!queuedChoice) {
+          queuedChoice = await this.episodeChoicesRepository.save(
+            this.episodeChoicesRepository.create({
+              choiceRecordId: uuidv4(),
+              seasonId,
+              episodeId,
+              episodeNumber: episode.episodeNumber,
+              choiceId: selectedChoice.id,
+              choicePayload: selectedChoice,
+              resultingStoryState: updatedStoryState,
+              generationStatus: 'queued',
+              generationJobId: null,
+              targetEpisodeNumber: nextEpisodeNumber,
+              generationError: null,
+              createdAt: now,
+              updatedAt: now,
+            }),
+          );
+          await this.awardChoiceCrystals(season.ownerUserId, seasonId, episode, selectedChoice);
+        }
+
+        const activeJob = queuedChoice.generationJobId
+          ? await this.generationJobsRepository.findOne({ where: { jobId: queuedChoice.generationJobId } })
+          : null;
+        if (!activeJob || !['pending', 'processing'].includes(activeJob.status)) {
+          const job = await this.generationJobsRepository.save(
+            this.generationJobsRepository.create({
+              jobId: uuidv4(),
+              seasonId,
+              episodeId,
+              jobType: 'episode_choice_generation',
+              status: 'pending',
+              payload: {
+                sourceEpisodeId: episodeId,
+                choiceId: selectedChoice.id,
+                nextEpisodeNumber,
+                choiceRecordId: queuedChoice.choiceRecordId,
+                attemptCount: Number(activeJob?.payload?.attemptCount || 0),
+              },
+              result: {},
+              error: null,
+              promptVersion: EPISODE_PROMPT_VERSION,
+              createdAt: now,
+              updatedAt: now,
+            }),
+          );
+          queuedChoice.generationJobId = job.jobId;
+        }
+        queuedChoice.generationStatus = 'queued';
+        queuedChoice.targetEpisodeNumber = nextEpisodeNumber;
+        queuedChoice.generationError = null;
+        queuedChoice.updatedAt = now;
+        await this.episodeChoicesRepository.save(queuedChoice);
+        await this.seasonsRepository.save(season);
+        this.logPipelineStep('choice_generation_queued', {
+          seasonId,
+          episodeId,
+          choiceId: selectedChoice.id,
+          nextEpisodeNumber,
+          preparedStatus: preparedEpisode?.status || null,
+          canUsePreparedEpisode,
+          canUsePreparedPlan,
+          choiceRecordId: queuedChoice.choiceRecordId,
+          jobId: queuedChoice.generationJobId,
+        });
+        return this.getSeason(seasonId);
+      }
+
       const nextEpisodeContent = canUsePreparedEpisode
         ? preparedEpisode?.payload?.episodeContent
         : canUsePreparedPlan
@@ -3453,6 +3549,13 @@ export class SeasonsService {
         await this.preparedEpisodesRepository.save(preparedEpisode);
       }
 
+      if (existingChoiceRecord) {
+        existingChoiceRecord.generationStatus = 'ready';
+        existingChoiceRecord.generationError = null;
+        existingChoiceRecord.updatedAt = new Date();
+        await this.episodeChoicesRepository.save(existingChoiceRecord);
+      }
+
       season.currentEpisodeNumber = createdEpisode.episodeNumber;
       season.currentMiniArc = createdEpisode.miniArcNumber;
       season.status = 'episode_ready';
@@ -3495,14 +3598,8 @@ export class SeasonsService {
       this.logger.error(`[EpisodeChoice] apply failed seasonId=${seasonId} episodeId=${episodeId} choiceId=${choiceId} | ${formatted}`);
       try {
         const existingChoice = await this.episodeChoicesRepository.findOne({ where: { episodeId } });
-        const sourceEpisode = await this.episodesRepository.findOne({ where: { episodeId } });
-        const nextEpisode = sourceEpisode
-          ? await this.episodesRepository.findOne({
-              where: { seasonId, episodeNumber: sourceEpisode.episodeNumber + 1 },
-            })
-          : null;
         // Only restore siblings when the choice did not permanently lock in.
-        if (!existingChoice || !nextEpisode) {
+        if (!existingChoice) {
           await this.reactivateCancelledPreparedBranches(seasonId, episodeId);
         }
       } catch (reactivateError) {
@@ -3886,6 +3983,7 @@ export class SeasonsService {
     const results = [];
     const dryRun = Boolean(options.dryRun);
     const contentJobTypes = new Set([
+      'episode_choice_generation',
       'prepared_branch_plan',
       'prepared_episode_prose',
       'prepared_episode',
@@ -3928,6 +4026,8 @@ export class SeasonsService {
     };
 
     const typePriority: Record<string, number> = {
+      // A confirmed choice is user-visible work and must outrank speculative prefetch.
+      episode_choice_generation: -1,
       // Live current-episode media first (critical path for reading UX)
       tts_chunk: 0,
       image_generation: 1,
@@ -3978,6 +4078,9 @@ export class SeasonsService {
     };
 
     const executeJob = async (job: GenerationJob) => {
+      if (job.jobType === 'episode_choice_generation') {
+        return this.processEpisodeChoiceGenerationJob(job, dryRun);
+      }
       if (job.jobType === 'tts_chunk') {
         return this.processTtsJob(job, dryRun);
       }
@@ -4142,6 +4245,75 @@ export class SeasonsService {
       results,
       season: await this.getSeason(seasonId),
     };
+  }
+
+  private async processEpisodeChoiceGenerationJob(job: GenerationJob, dryRun: boolean) {
+    const claimed = await this.claimPendingJob(job);
+    if (!claimed) {
+      return { jobId: job.jobId, status: 'skipped' };
+    }
+
+    const sourceEpisodeId = String(job.payload?.sourceEpisodeId || job.episodeId || '');
+    const choiceId = String(job.payload?.choiceId || '');
+    const choiceRecordId = String(job.payload?.choiceRecordId || '');
+    const choiceRecord = choiceRecordId
+      ? await this.episodeChoicesRepository.findOne({ where: { choiceRecordId } })
+      : await this.episodeChoicesRepository.findOne({ where: { episodeId: sourceEpisodeId } });
+
+    if (!sourceEpisodeId || !choiceId || !choiceRecord) {
+      job.status = 'failed';
+      job.error = 'episode choice generation metadata is missing';
+      job.updatedAt = new Date();
+      await this.generationJobsRepository.save(job);
+      return { jobId: job.jobId, status: job.status, error: job.error };
+    }
+
+    choiceRecord.generationStatus = 'processing';
+    choiceRecord.generationError = null;
+    choiceRecord.updatedAt = new Date();
+    await this.episodeChoicesRepository.save(choiceRecord);
+
+    try {
+      if (dryRun) {
+        throw new Error('Dry-run episode choice generation is disabled: episode text must come from the model or fail explicitly.');
+      }
+      const season = await this.applyEpisodeChoice(job.seasonId, sourceEpisodeId, choiceId, {
+        fromGenerationJob: true,
+      });
+      choiceRecord.generationStatus = 'ready';
+      choiceRecord.generationError = null;
+      choiceRecord.updatedAt = new Date();
+      await this.episodeChoicesRepository.save(choiceRecord);
+
+      job.status = 'ready';
+      job.result = {
+        choiceRecordId: choiceRecord.choiceRecordId,
+        nextEpisodeNumber: choiceRecord.targetEpisodeNumber,
+      };
+      job.error = null;
+      job.updatedAt = new Date();
+      await this.generationJobsRepository.save(job);
+      return { jobId: job.jobId, status: job.status, seasonId: season.seasonId };
+    } catch (error) {
+      const formatted = this.formatGenerationError(error);
+      choiceRecord.generationStatus = 'failed';
+      choiceRecord.generationError = formatted;
+      choiceRecord.updatedAt = new Date();
+      await this.episodeChoicesRepository.save(choiceRecord);
+
+      job.status = 'failed';
+      job.error = formatted;
+      job.updatedAt = new Date();
+      await this.generationJobsRepository.save(job);
+      this.logPipelineStep('choice_generation_failed', {
+        seasonId: job.seasonId,
+        episodeId: sourceEpisodeId,
+        choiceId,
+        choiceRecordId: choiceRecord.choiceRecordId,
+        error: formatted,
+      });
+      return { jobId: job.jobId, status: job.status, error: job.error };
+    }
   }
 
   async getUserProgress(ownerUserId: string) {
@@ -7054,6 +7226,10 @@ The image must be suitable as a visual consistency reference for future story il
             },
           );
 
+      const cancelledAfterGeneration = await this.abortJobIfPreparedCancelled(job, preparedEpisodeId);
+      if (cancelledAfterGeneration) {
+        return cancelledAfterGeneration;
+      }
 
       prepared.payload = {
         ...(prepared.payload || {}),
@@ -7441,6 +7617,10 @@ The image must be suitable as a visual consistency reference for future story il
     dryRun: boolean,
   ) {
     const preparedEpisodeId = prepared.preparedEpisodeId;
+    const cancelled = await this.abortJobIfPreparedCancelled(job, preparedEpisodeId);
+    if (cancelled) {
+      return cancelled;
+    }
     const canonicalEpisodeContent = await this.canonicalizeEpisodeContentSceneCharacters(
       job.seasonId,
       episodeContent,
@@ -7541,7 +7721,7 @@ The image must be suitable as a visual consistency reference for future story il
     const preparedEpisodeId = String(job.payload?.preparedEpisodeId || '');
     if (preparedEpisodeId) {
       const prepared = await this.preparedEpisodesRepository.findOne({ where: { preparedEpisodeId } });
-      if (prepared) {
+      if (prepared && prepared.status !== 'cancelled') {
         prepared.status = 'failed';
         prepared.updatedAt = new Date();
         await this.preparedEpisodesRepository.save(prepared);
@@ -7599,6 +7779,10 @@ The image must be suitable as a visual consistency reference for future story il
             voice,
             speed,
           );
+      const cancelledAfterGeneration = await this.abortJobIfPreparedCancelled(job, preparedEpisodeId);
+      if (cancelledAfterGeneration) {
+        return cancelledAfterGeneration;
+      }
       const alignmentJobId = await this.persistPreparedTtsResult(
         job,
         preparedEpisodeId,
@@ -7615,6 +7799,13 @@ The image must be suitable as a visual consistency reference for future story il
         audioUrl: audio.audioUrl,
       };
     } catch (error) {
+      const cancelled = await this.abortJobIfPreparedCancelled(
+        job,
+        String(job.payload?.metadata?.preparedEpisodeId || ''),
+      );
+      if (cancelled) {
+        return cancelled;
+      }
       job.status = 'failed';
       job.error = this.formatGenerationError(error);
       job.updatedAt = new Date();

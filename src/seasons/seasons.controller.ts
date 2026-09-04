@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, HttpException, HttpStatus, Param, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, HttpException, HttpStatus, Param, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SeasonsService } from './seasons.service';
 import { CurrentUser } from '../users/current-user.decorator';
@@ -427,6 +427,7 @@ export class SeasonsController {
   }
 
   @Post(':seasonId/episodes/:episodeId/choices')
+  @HttpCode(HttpStatus.ACCEPTED)
   async applyEpisodeChoice(
     @Param('seasonId') seasonId: string,
     @Param('episodeId') episodeId: string,
