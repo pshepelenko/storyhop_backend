@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { JsonGenerationOptions, OpenRouterService } from '../openrouter/openrouter.service';
 import { StorageService } from '../storage/storage.service';
 import { AudioMetadataService } from '../audio-metadata/audio-metadata.service';
+import { ReadingAlignment, ReadingAlignmentService } from '../reading-alignment/reading-alignment.service';
 import { PromptsService } from '../prompts/prompts.service';
 import { validateSeasonFramework } from './framework-validator';
 import { Season } from './entities/season.entity';
@@ -68,6 +69,7 @@ const PREPARED_IMAGE_PROMPT_VERSION = 'prepared-image-v1';
 const PREPARED_PLAN_PROMPT_VERSION = 'prepared-next-v3';
 const PREPARED_PROSE_PROMPT_VERSION = 'prepared-next-v3';
 const TTS_JOB_PROMPT_VERSION = 'tts-job-v2';
+const READING_ALIGNMENT_JOB_PROMPT_VERSION = 'reading-alignment-v1';
 const SEASON_TITLE_PROMPT_VERSION = 'season-title-v1';
 const EPISODE_MIN_WORDS = 240;
 const EPISODE_MAX_WORDS = 320;
@@ -196,6 +198,13 @@ export class SeasonsService {
   private readonly heroReferenceImageInFlight = new Map<string, Promise<void>>();
   private readonly seasonCoverInFlight = new Map<string, Promise<void>>();
   private readonly seasonTitleQueueInFlight = new Map<string, Promise<void>>();
+  private readonly queuedReadingAlignmentJobIds: string[] = [];
+  private readonly queuedReadingAlignmentJobIdSet = new Set<string>();
+  private activeReadingAlignmentJobs = 0;
+  private readonly readingAlignmentConcurrency = Math.max(
+    1,
+    Math.min(2, Number(process.env.READING_ALIGNMENT_CONCURRENCY || 2)),
+  );
   /** Recent image-provider failure timestamps for prefetch image circuit-breaking. */
   private readonly imageProviderFailureTimestamps: number[] = [];
 
@@ -236,6 +245,7 @@ export class SeasonsService {
     private readonly ttiPromptService: TtiPromptService,
     private readonly storage: StorageService,
     private readonly audioMetadata: AudioMetadataService,
+    private readonly readingAlignment: ReadingAlignmentService,
     private readonly prompts: PromptsService,
     private readonly logger: FileLogger,
   ) {}
@@ -3883,6 +3893,7 @@ export class SeasonsService {
     ]);
     const ttsJobTypes = new Set(['prepared_tts_chunk', 'tts_chunk']);
     const imageJobTypes = new Set(['prepared_image_generation', 'image_generation']);
+    const readingAlignmentJobTypes = new Set(['audio_reading_alignment', 'prepared_audio_reading_alignment']);
 
     await this.expireOverdueGenerationJobs(seasonId, options.jobType);
     await this.reconcilePreparedAudioChunksForSeason(seasonId);
@@ -3927,6 +3938,10 @@ export class SeasonsService {
       prepared_tts_chunk: 5,
       prepared_image_generation: 6,
       season_title: 7,
+      // Exact timestamps refine an already-visible deterministic map. They must
+      // never outrank prose, TTS, or illustrations.
+      audio_reading_alignment: 8,
+      prepared_audio_reading_alignment: 9,
     };
 
     const pullPendingJobs = async () => {
@@ -3986,6 +4001,9 @@ export class SeasonsService {
       }
       if (job.jobType === 'season_title') {
         return this.processSeasonTitleJob(job, dryRun);
+      }
+      if (readingAlignmentJobTypes.has(job.jobType)) {
+        return this.processReadingAlignmentJob(job, dryRun);
       }
       return undefined;
     };
@@ -4107,6 +4125,15 @@ export class SeasonsService {
       );
       for (const item of mediaResults) {
         recordResult(item.job, item.result);
+      }
+    }
+
+    // One low-priority timestamp request per worker pass. This runs after media
+    // scheduling; the reader already has a deterministic map while it waits.
+    if (results.length < limit) {
+      const alignmentJob = (await pullPendingJobs()).find((job) => readingAlignmentJobTypes.has(job.jobType));
+      if (alignmentJob) {
+        recordResult(alignmentJob, await executeJob(alignmentJob));
       }
     }
 
@@ -6765,7 +6792,15 @@ The image must be suitable as a visual consistency reference for future story il
             voice,
             speed,
           );
-      await this.persistEpisodeTtsResult(job, episode.episodeId, metadata, audio.audioUrl, audio.durationSeconds, dryRun);
+      const alignmentJobId = await this.persistEpisodeTtsResult(
+        job,
+        episode.episodeId,
+        metadata,
+        audio.audioUrl,
+        audio.durationSeconds,
+        dryRun,
+      );
+      this.scheduleReadingAlignment(alignmentJobId, dryRun);
 
       return {
         jobId: job.jobId,
@@ -7564,7 +7599,15 @@ The image must be suitable as a visual consistency reference for future story il
             voice,
             speed,
           );
-      await this.persistPreparedTtsResult(job, preparedEpisodeId, metadata, audio.audioUrl, audio.durationSeconds, dryRun);
+      const alignmentJobId = await this.persistPreparedTtsResult(
+        job,
+        preparedEpisodeId,
+        metadata,
+        audio.audioUrl,
+        audio.durationSeconds,
+        dryRun,
+      );
+      this.scheduleReadingAlignment(alignmentJobId, dryRun);
 
       return {
         jobId: job.jobId,
@@ -8966,7 +9009,7 @@ Requirements:
     audioUrl: string,
     durationSeconds: number,
     dryRun: boolean,
-  ) {
+  ): Promise<string | null> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -8992,10 +9035,28 @@ Requirements:
         throw new Error(`Episode TTS chunk ${metadata.chunkId || 'unknown'} was not found`);
       }
 
-      episode.audioChunks = updatedAudioChunks;
-      episode.generationStatus = this.getEpisodeAudioGenerationStatus(updatedAudioChunks);
+      const alignedAudioChunks = this.attachEstimatedReadingAlignment(
+        updatedAudioChunks,
+        metadata.chunkId,
+        String(job.payload?.text || ''),
+        audioUrl,
+        durationSeconds,
+      );
+
+      episode.audioChunks = alignedAudioChunks;
+      episode.generationStatus = this.getEpisodeAudioGenerationStatus(alignedAudioChunks);
       episode.updatedAt = new Date();
       await queryRunner.manager.save(Episode, episode);
+
+      const alignmentJob = await this.enqueueReadingAlignmentJob(queryRunner.manager, {
+        seasonId: job.seasonId,
+        episodeId,
+        chunkId: String(metadata.chunkId || ''),
+        audioUrl,
+        text: String(job.payload?.text || ''),
+        source: 'episode',
+        dryRun,
+      });
 
       job.status = dryRun ? 'ready_dry_run' : 'ready';
       job.result = {
@@ -9009,6 +9070,7 @@ Requirements:
       await queryRunner.manager.save(GenerationJob, job);
 
       await queryRunner.commitTransaction();
+      return alignmentJob?.jobId || null;
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw error;
@@ -9024,7 +9086,7 @@ Requirements:
     audioUrl: string,
     durationSeconds: number,
     dryRun: boolean,
-  ) {
+  ): Promise<string | null> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -9053,13 +9115,32 @@ Requirements:
         throw new Error(`Prepared TTS chunk ${metadata.chunkId || 'unknown'} was not found for ${preparedEpisodeId}`);
       }
 
+      const alignedPreparedAudioChunks = this.attachEstimatedReadingAlignment(
+        updatedPreparedAudioChunks,
+        metadata.chunkId,
+        String(job.payload?.text || ''),
+        audioUrl,
+        durationSeconds,
+      );
+
       prepared.payload = {
         ...(prepared.payload || {}),
-        preparedAudioChunks: updatedPreparedAudioChunks,
+        preparedAudioChunks: alignedPreparedAudioChunks,
       };
-      prepared.status = this.resolvePreparedEpisodeStatus(prepared.status, updatedPreparedAudioChunks);
+      prepared.status = this.resolvePreparedEpisodeStatus(prepared.status, alignedPreparedAudioChunks);
       prepared.updatedAt = new Date();
       await queryRunner.manager.save(PreparedEpisode, prepared);
+
+      const alignmentJob = await this.enqueueReadingAlignmentJob(queryRunner.manager, {
+        seasonId: job.seasonId,
+        episodeId: null,
+        preparedEpisodeId,
+        chunkId: String(metadata.chunkId || ''),
+        audioUrl,
+        text: String(job.payload?.text || ''),
+        source: 'prepared',
+        dryRun,
+      });
 
       job.status = dryRun ? 'ready_dry_run' : 'ready';
       job.result = {
@@ -9073,11 +9154,239 @@ Requirements:
       await queryRunner.manager.save(GenerationJob, job);
 
       await queryRunner.commitTransaction();
+      return alignmentJob?.jobId || null;
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw error;
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  private attachEstimatedReadingAlignment(
+    audioChunks: Record<string, any>[],
+    chunkId: string,
+    text: string,
+    audioUrl: string,
+    durationSeconds: number,
+  ) {
+    if (!text || !audioUrl || durationSeconds <= 0) {
+      return audioChunks;
+    }
+    const alignment = this.readingAlignment.buildEstimated(text, audioUrl, durationSeconds);
+    return audioChunks.map((chunk) =>
+      chunk.chunkId === chunkId
+        ? { ...chunk, readingAlignment: alignment }
+        : chunk,
+    );
+  }
+
+  private async enqueueReadingAlignmentJob(
+    manager: EntityManager,
+    input: {
+      seasonId: string;
+      episodeId: string | null;
+      preparedEpisodeId?: string;
+      chunkId: string;
+      audioUrl: string;
+      text: string;
+      source: 'episode' | 'prepared';
+      dryRun: boolean;
+    },
+  ): Promise<GenerationJob | null> {
+    if (
+      input.dryRun ||
+      !this.readingAlignment.isEnabled() ||
+      !input.chunkId ||
+      !input.text ||
+      !input.audioUrl
+    ) {
+      return null;
+    }
+
+    const jobType = input.source === 'episode'
+      ? 'audio_reading_alignment'
+      : 'prepared_audio_reading_alignment';
+    const candidates = await manager.find(GenerationJob, {
+      where: {
+        seasonId: input.seasonId,
+        episodeId: input.episodeId,
+        jobType,
+      },
+      order: { createdAt: 'DESC' },
+    });
+    const textHash = this.readingAlignment.textHash(input.text);
+    const exists = candidates.some((candidate) =>
+      String(candidate.payload?.metadata?.chunkId || '') === input.chunkId &&
+      String(candidate.payload?.metadata?.audioUrl || '') === input.audioUrl &&
+      String(candidate.payload?.metadata?.textHash || '') === textHash &&
+      !['failed', 'expired', 'cancelled'].includes(candidate.status),
+    );
+    if (exists) return null;
+
+    const now = new Date();
+    return manager.save(GenerationJob, {
+      jobId: uuidv4(),
+      seasonId: input.seasonId,
+      episodeId: input.episodeId,
+      jobType,
+      status: 'pending',
+      payload: {
+        metadata: {
+          chunkId: input.chunkId,
+          preparedEpisodeId: input.preparedEpisodeId || null,
+          audioUrl: input.audioUrl,
+          textHash,
+        },
+      },
+      result: {},
+      error: null,
+      promptVersion: READING_ALIGNMENT_JOB_PROMPT_VERSION,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  /**
+   * A TTS worker schedules alignment the moment one MP3 is persisted. The
+   * bounded queue keeps the enhancement from competing with media generation.
+   */
+  private scheduleReadingAlignment(jobId: string | null, dryRun: boolean) {
+    if (!jobId || dryRun || !this.readingAlignment.isEnabled() || this.queuedReadingAlignmentJobIdSet.has(jobId)) {
+      return;
+    }
+    this.queuedReadingAlignmentJobIds.push(jobId);
+    this.queuedReadingAlignmentJobIdSet.add(jobId);
+    void this.pumpReadingAlignmentQueue();
+  }
+
+  private async pumpReadingAlignmentQueue() {
+    while (
+      this.activeReadingAlignmentJobs < this.readingAlignmentConcurrency &&
+      this.queuedReadingAlignmentJobIds.length > 0
+    ) {
+      const jobId = this.queuedReadingAlignmentJobIds.shift()!;
+      this.queuedReadingAlignmentJobIdSet.delete(jobId);
+      this.activeReadingAlignmentJobs += 1;
+      void (async () => {
+        try {
+          const job = await this.generationJobsRepository.findOne({ where: { jobId } });
+          if (job) {
+            await this.processReadingAlignmentJob(job, false);
+          }
+        } catch (error) {
+          this.logger.logOpenRouterError(`ReadingAlignment queued jobId=${jobId}`, error);
+        } finally {
+          this.activeReadingAlignmentJobs -= 1;
+          void this.pumpReadingAlignmentQueue();
+        }
+      })();
+    }
+  }
+
+  private async processReadingAlignmentJob(job: GenerationJob, dryRun: boolean) {
+    const claimed = await this.claimPendingJob(job);
+    if (!claimed) return { jobId: job.jobId, status: 'skipped' };
+
+    try {
+      const metadata = job.payload?.metadata || {};
+      const preparedEpisodeId = String(metadata.preparedEpisodeId || '');
+      const isPrepared = job.jobType === 'prepared_audio_reading_alignment';
+      const source = isPrepared
+        ? await this.preparedEpisodesRepository.findOne({ where: { preparedEpisodeId } })
+        : job.episodeId
+          ? await this.episodesRepository.findOne({ where: { episodeId: job.episodeId } })
+          : null;
+      const audioChunks = isPrepared
+        ? Array.isArray((source as PreparedEpisode | null)?.payload?.preparedAudioChunks)
+          ? (source as PreparedEpisode).payload.preparedAudioChunks
+          : []
+        : (source as Episode | null)?.audioChunks || [];
+      const chunkIndex = audioChunks.findIndex((chunk: any) => chunk.chunkId === metadata.chunkId);
+      const chunk = chunkIndex >= 0 ? audioChunks[chunkIndex] : null;
+      if (!source || !chunk || chunk.audioUrl !== metadata.audioUrl || !chunk.text) {
+        job.status = 'cancelled';
+        job.error = 'stale audio chunk';
+        job.updatedAt = new Date();
+        await this.generationJobsRepository.save(job);
+        return { jobId: job.jobId, status: 'cancelled' };
+      }
+
+      const estimated = chunk.readingAlignment && chunk.readingAlignment.textHash === metadata.textHash
+        ? chunk.readingAlignment as ReadingAlignment
+        : this.readingAlignment.buildEstimated(chunk.text, chunk.audioUrl, Number(chunk.durationSeconds || 0));
+      const alignment = dryRun
+        ? estimated
+        : await this.readingAlignment.createExact(
+            chunk.text,
+            chunk.audioUrl,
+            Number(chunk.durationSeconds || 0),
+            estimated,
+          );
+
+      // Other chunks may finish TTS while STT is running. Re-read under a row
+      // lock so the alignment update cannot roll back their ready state.
+      await this.dataSource.transaction(async (manager) => {
+        const currentSource = isPrepared
+          ? await manager.findOne(PreparedEpisode, {
+              where: { preparedEpisodeId },
+              lock: { mode: 'pessimistic_write' },
+            })
+          : job.episodeId
+            ? await manager.findOne(Episode, {
+                where: { episodeId: job.episodeId },
+                lock: { mode: 'pessimistic_write' },
+              })
+            : null;
+        const currentChunks = isPrepared
+          ? Array.isArray((currentSource as PreparedEpisode | null)?.payload?.preparedAudioChunks)
+            ? (currentSource as PreparedEpisode).payload.preparedAudioChunks
+            : []
+          : (currentSource as Episode | null)?.audioChunks || [];
+        const currentChunkIndex = currentChunks.findIndex((item: any) => item.chunkId === metadata.chunkId);
+        const currentChunk = currentChunkIndex >= 0 ? currentChunks[currentChunkIndex] : null;
+        if (!currentSource || !currentChunk || currentChunk.audioUrl !== metadata.audioUrl || currentChunk.text !== chunk.text) {
+          job.status = 'cancelled';
+          job.error = 'stale audio chunk';
+          job.updatedAt = new Date();
+          await manager.save(GenerationJob, job);
+          return;
+        }
+
+        const nextChunks = currentChunks.map((item: any, index: number) =>
+          index === currentChunkIndex ? { ...item, readingAlignment: alignment } : item,
+        );
+        if (isPrepared) {
+          const prepared = currentSource as PreparedEpisode;
+          prepared.payload = { ...(prepared.payload || {}), preparedAudioChunks: nextChunks };
+          prepared.updatedAt = new Date();
+          await manager.save(PreparedEpisode, prepared);
+        } else {
+          const episode = currentSource as Episode;
+          episode.audioChunks = nextChunks;
+          episode.updatedAt = new Date();
+          await manager.save(Episode, episode);
+        }
+
+        job.status = 'ready';
+        job.result = {
+          chunkId: metadata.chunkId,
+          alignmentStatus: alignment.status,
+          coverage: alignment.coverage ?? null,
+          costUsd: alignment.costUsd ?? null,
+          requestId: alignment.requestId ?? null,
+        };
+        job.error = alignment.status === 'failed' ? alignment.errorCode || 'fallback_to_estimated' : null;
+        job.updatedAt = new Date();
+        await manager.save(GenerationJob, job);
+      });
+      return { jobId: job.jobId, status: job.status, alignmentStatus: alignment.status };
+    } catch (error) {
+      job.status = 'failed';
+      job.error = this.formatGenerationError(error);
+      job.updatedAt = new Date();
+      await this.generationJobsRepository.save(job);
+      return { jobId: job.jobId, status: job.status, error: job.error };
     }
   }
 

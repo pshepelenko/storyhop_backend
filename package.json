@@ -24,6 +24,7 @@
     "import:demo-media": "ts-node -r tsconfig-paths/register src/scripts/import-demo-story-media.ts",
     "normalize:tts-media": "ts-node -r tsconfig-paths/register src/scripts/normalize-tts-media.ts",
     "backfill:season-titles": "ts-node -r tsconfig-paths/register src/scripts/backfill-season-titles.ts",
+    "backfill:demo-reading-alignments": "ts-node -r tsconfig-paths/register src/scripts/backfill-demo-reading-alignments.ts",
     "diagnose:openrouter": "node scripts/diagnose-openrouter.cjs",
     "smoke:pixazo-r2": "node scripts/smoke-pixazo-r2.cjs",
     "smoke:migrations": "node scripts/smoke-migrations.cjs",

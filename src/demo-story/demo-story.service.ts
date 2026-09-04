@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { OpenRouterService } from '../openrouter/openrouter.service';
 import { StorageService } from '../storage/storage.service';
 import { AudioMetadataService } from '../audio-metadata/audio-metadata.service';
+import { ReadingAlignmentService } from '../reading-alignment/reading-alignment.service';
 import { DemoStory } from './demo-story.entity';
 import { DemoStoryNode } from './demo-story-node.entity';
 import { DEMO_MEDIA_VERSION, DEMO_STORY_ID, DEMO_STORY_SLUG, demoStoryContent, demoStoryNodes } from './demo-story.content';
@@ -18,6 +19,7 @@ export class DemoStoryService {
     private readonly openRouter: OpenRouterService,
     private readonly storage: StorageService,
     private readonly audioMetadata: AudioMetadataService,
+    private readonly readingAlignment: ReadingAlignmentService,
   ) {}
 
   async getDemoStory(slug = DEMO_STORY_SLUG) {
@@ -230,6 +232,73 @@ export class DemoStoryService {
       importedImages: snapshot.length,
       importedAudioChunks: requiredKeys.length - snapshot.length,
     };
+  }
+
+  /**
+   * One-time, idempotent enrichment for reviewed demo MP3 files. It never
+   * generates demo text, audio, or images.
+   */
+  async backfillReadingAlignments() {
+    await this.ensureTextSeed();
+    const story = await this.demoStories.findOne({ where: { slug: DEMO_STORY_SLUG } });
+    if (!story) throw new Error('Demo story text seed failed');
+    const nodes = await this.demoNodes.find({
+      where: { demoStoryId: story.demoStoryId },
+      order: { episodeNumber: 'ASC', nodeKey: 'ASC' },
+    });
+
+    const result = { scanned: 0, exact: 0, estimated: 0, skipped: 0 };
+    for (const node of nodes) {
+      let changed = false;
+      const nextChunks = (node.audioChunks || []).map((chunk: any) => ({ ...chunk }));
+      for (let index = 0; index < nextChunks.length; index += 1) {
+        const chunk = nextChunks[index];
+        if (chunk.type !== 'chapter' || !chunk.audioUrl || !chunk.text) continue;
+        const key = this.storage.extractKeyFromUrl(chunk.audioUrl);
+        if (!key) {
+          result.skipped += 1;
+          continue;
+        }
+        // Imported demo MP3s predate the header repair. Normalize bytes only
+        // in memory for STT, without changing their R2 key or media content.
+        const { body } = await this.storage.download(key);
+        const normalized = this.audioMetadata.normalizeMp3(body);
+        const durationSeconds = normalized.durationSeconds;
+        if (durationSeconds <= 0) {
+          result.skipped += 1;
+          continue;
+        }
+        if (Number(chunk.durationSeconds || 0) !== durationSeconds) {
+          nextChunks[index] = { ...chunk, durationSeconds };
+          changed = true;
+        }
+        result.scanned += 1;
+        const textHash = this.readingAlignment.textHash(chunk.text);
+        const current = chunk.readingAlignment;
+        if (current?.status === 'exact' && current.textHash === textHash && current.audioUrl === chunk.audioUrl) {
+          result.skipped += 1;
+          continue;
+        }
+        const estimated = this.readingAlignment.buildEstimated(chunk.text, chunk.audioUrl, durationSeconds);
+        const alignment = await this.readingAlignment.createExact(
+          chunk.text,
+          chunk.audioUrl,
+          durationSeconds,
+          estimated,
+          normalized.buffer,
+        );
+        nextChunks[index] = { ...nextChunks[index], readingAlignment: alignment };
+        changed = true;
+        if (alignment.status === 'exact') result.exact += 1;
+        else result.estimated += 1;
+      }
+      if (changed) {
+        node.audioChunks = nextChunks;
+        node.updatedAt = new Date();
+        await this.demoNodes.save(node);
+      }
+    }
+    return result;
   }
 
   private async ensureTextSeed(force = false) {

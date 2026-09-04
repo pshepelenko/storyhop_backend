@@ -37,6 +37,7 @@ import { DemoStoryNode } from './demo-story/demo-story-node.entity';
 import { runMigrations } from './migrations/migration-runner';
 import { UsersModule } from './users/users.module';
 import { AudioMetadataModule } from './audio-metadata/audio-metadata.module';
+import { ReadingAlignmentModule } from './reading-alignment/reading-alignment.module';
 
 const env = (...keys: string[]) => keys.map((key) => process.env[key]).find(Boolean);
 const envFlag = (...keys: string[]) => env(...keys) === 'true';
@@ -72,6 +73,7 @@ const envFlag = (...keys: string[]) => env(...keys) === 'true';
     LoggingModule,
     UsersModule,
     AudioMetadataModule,
+    ReadingAlignmentModule,
     SeasonsModule,
     WorkerModule,
     ReferralModule,

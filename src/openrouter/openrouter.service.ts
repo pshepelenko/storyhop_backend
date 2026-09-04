@@ -12,6 +12,8 @@ export interface OpenRouterConfig {
   ttsVoice: string;
   sttModel: string;
   sttFallbackModel: string;
+  readingAlignmentModel: string;
+  readingAlignmentProviderOrder: string[];
   imageModel: string;
   imageAspectRatio: string;
   imageQuality: string;
@@ -31,6 +33,16 @@ export interface OpenRouterTranscriptionResult {
   requestId: string | null;
   durationSeconds: number | null;
   costUsd: number | null;
+}
+
+export interface OpenRouterTimestampedWord {
+  word: string;
+  start: number;
+  end: number;
+}
+
+export interface OpenRouterTimestampedTranscriptionResult extends OpenRouterTranscriptionResult {
+  words: OpenRouterTimestampedWord[];
 }
 
 export interface OpenRouterImageGenerationResult {
@@ -79,6 +91,12 @@ export class OpenRouterService {
       ttsVoice: process.env.OPENROUTER_TTS_VOICE || 'bm_lewis',
       sttModel: process.env.OPENROUTER_STT_MODEL || 'mistralai/voxtral-small-24b-2507-stt',
       sttFallbackModel: process.env.OPENROUTER_STT_FALLBACK_MODEL || 'openai/gpt-transcribe',
+      readingAlignmentModel: process.env.OPENROUTER_READING_ALIGNMENT_MODEL || 'openai/whisper-large-v3-turbo',
+      readingAlignmentProviderOrder: this.parseProviderOrder(
+        process.env.OPENROUTER_READING_ALIGNMENT_PROVIDER_ORDER || 'Groq',
+        process.env.OPENROUTER_READING_ALIGNMENT_MODEL || 'openai/whisper-large-v3-turbo',
+        'flash',
+      ),
       imageModel: process.env.OPENROUTER_IMAGE_MODEL || 'openai/gpt-image-2',
       imageAspectRatio: process.env.OPENROUTER_IMAGE_ASPECT_RATIO || '3:2',
       imageQuality: process.env.OPENROUTER_IMAGE_QUALITY || 'low',
@@ -222,6 +240,10 @@ export class OpenRouterService {
 
   getSttModel(): string {
     return this.config.sttModel;
+  }
+
+  getReadingAlignmentModel(): string {
+    return this.config.readingAlignmentModel;
   }
 
   getSttFallbackModel(): string {
@@ -485,6 +507,65 @@ export class OpenRouterService {
     }
   }
 
+  async transcribeReadingAlignment(audio: Buffer): Promise<OpenRouterTimestampedTranscriptionResult> {
+    const model = this.config.readingAlignmentModel;
+    const response = await axios.post(
+      'https://openrouter.ai/api/v1/audio/transcriptions',
+      {
+        model,
+        input_audio: {
+          data: audio.toString('base64'),
+          format: 'mp3',
+        },
+        language: 'en',
+        temperature: 0,
+        // The transcription endpoint otherwise may return only its small
+        // default token budget, which looks like a valid but truncated map.
+        max_tokens: 1024,
+        response_format: 'verbose_json',
+        timestamp_granularities: ['word', 'segment'],
+        provider: this.buildProviderRouting(
+          this.config.readingAlignmentProviderOrder,
+          false,
+          '',
+        ),
+      },
+      // Alignment is background-only: a little headroom avoids rejecting an
+      // otherwise valid long chapter while the reader keeps its instant map.
+      { headers: this.authHeaders(), timeout: 15000 },
+    );
+
+    const transcript = String(response.data?.text || '').trim();
+    const words = Array.isArray(response.data?.words)
+      ? response.data.words
+          .map((word: any) => ({
+            word: String(word?.word || ''),
+            start: Number(word?.start),
+            end: Number(word?.end),
+          }))
+          .filter((word: OpenRouterTimestampedWord) =>
+            Boolean(word.word.trim()) && Number.isFinite(word.start) && Number.isFinite(word.end) && word.end > word.start,
+          )
+      : [];
+    if (!transcript || !words.length) {
+      throw new Error('OpenRouter reading alignment response did not include word timestamps');
+    }
+
+    const requestId = String(
+      response.headers?.['x-generation-id'] || response.headers?.['x-request-id'] || response.headers?.['request-id'] || '',
+    ).trim() || null;
+    const durationSeconds = Number(response.data?.usage?.seconds ?? response.data?.duration);
+    const costUsd = Number(response.data?.usage?.cost);
+    return {
+      transcript,
+      words,
+      model,
+      requestId,
+      durationSeconds: Number.isFinite(durationSeconds) ? durationSeconds : null,
+      costUsd: Number.isFinite(costUsd) ? costUsd : null,
+    };
+  }
+
   private shouldFallbackTranscription(error: unknown): boolean {
     const status = Number((error as { response?: { status?: number } } | null)?.response?.status || 0);
     return !status || status === 429 || status >= 500;
@@ -542,6 +623,7 @@ export class OpenRouterService {
       this.config.ttsModel,
       this.config.sttModel,
       this.config.sttFallbackModel,
+      this.config.readingAlignmentModel,
       this.config.imageModel,
     ].filter((model, index, list) => Boolean(model) && list.indexOf(model) === index);
 
@@ -551,7 +633,8 @@ export class OpenRouterService {
           model === this.config.imageModel ||
           model === this.config.ttsModel ||
           model === this.config.sttModel ||
-          model === this.config.sttFallbackModel
+          model === this.config.sttFallbackModel ||
+          model === this.config.readingAlignmentModel
         ) {
           await axios.get(
             `https://openrouter.ai/api/v1/models/${encodeURIComponent(model)}/endpoints`,
