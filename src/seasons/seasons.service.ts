@@ -4583,6 +4583,45 @@ export class SeasonsService {
     };
   }
 
+  /** Maintenance-only repair for a branch that was promoted before its media
+   * metadata could be copied. It never sends audio to an AI provider. */
+  async repairUsedPreparedEpisodeMedia(seasonId: string, episodeNumber: number) {
+    const episode = await this.episodesRepository.findOne({ where: { seasonId, episodeNumber } });
+    if (!episode) {
+      throw new Error(`Episode ${episodeNumber} was not found`);
+    }
+    const prepared = await this.findPreparedEpisodeForCurrentEpisode(seasonId, episode);
+    if (!prepared?.payload?.usedEpisodeId || prepared.payload.usedEpisodeId !== episode.episodeId) {
+      throw new Error(`Episode ${episodeNumber} has no used prepared branch`);
+    }
+
+    const preparedChunks = Array.isArray(prepared.payload?.preparedAudioChunks)
+      ? prepared.payload.preparedAudioChunks
+      : [];
+    let copiedAlignments = 0;
+    episode.audioChunks = (episode.audioChunks || []).map((chunk: any) => {
+      const source = preparedChunks.find((item: any) => item.chunkId === chunk.chunkId && item.audioUrl === chunk.audioUrl);
+      if (!source) {
+        return chunk;
+      }
+      const next = {
+        ...chunk,
+        ...(Number(source.durationSeconds || 0) > 0 ? { durationSeconds: Number(source.durationSeconds) } : {}),
+        ...(source.readingAlignment ? { readingAlignment: source.readingAlignment } : {}),
+      };
+      if (source.readingAlignment && !chunk.readingAlignment) {
+        copiedAlignments += 1;
+      }
+      return next;
+    });
+    episode.updatedAt = new Date();
+    await this.episodesRepository.save(episode);
+
+    const hero = await this.heroesRepository.findOne({ where: { seasonId } });
+    await this.attachPreparedIllustration(seasonId, episode, hero, prepared);
+    return { seasonId, episodeId: episode.episodeId, episodeNumber, copiedAlignments };
+  }
+
   async unlockIllustration(seasonId: string, episodeId: string) {
 
     const season = await this.seasonsRepository.findOne({ where: { seasonId } });
@@ -6315,6 +6354,8 @@ The image must be suitable as a visual consistency reference for future story il
         text: chunk.text || '',
         status: chunk.status || 'pending',
         audioUrl: chunk.audioUrl || null,
+        ...(Number(chunk.durationSeconds || 0) > 0 ? { durationSeconds: Number(chunk.durationSeconds) } : {}),
+        ...(chunk.readingAlignment ? { readingAlignment: chunk.readingAlignment } : {}),
       }));
     }
 
@@ -7951,6 +7992,7 @@ The image must be suitable as a visual consistency reference for future story il
       }
 
       existingEntry.summary = candidate.moment || promptPayload.moment || existingEntry.summary;
+      await this.autoUnlockPreparedIllustrationIfEligible(seasonId, episode, illustrationId, existingEntry);
       if (existingEntry.status !== 'locked') {
         existingEntry.status = 'ready';
       }
@@ -7986,8 +8028,7 @@ The image must be suitable as a visual consistency reference for future story il
       }),
     );
 
-    await this.storybookEntriesRepository.save(
-      this.storybookEntriesRepository.create({
+    const entry = this.storybookEntriesRepository.create({
         storybookEntryId,
         seasonId,
         episodeId: episode.episodeId,
@@ -8005,8 +8046,9 @@ The image must be suitable as a visual consistency reference for future story il
         },
         createdAt: now,
         updatedAt: now,
-      }),
-    );
+      });
+    await this.autoUnlockPreparedIllustrationIfEligible(seasonId, episode, illustrationId, entry);
+    await this.storybookEntriesRepository.save(entry);
 
     this.logPipelineStep('prepared_illustration_attached', {
       seasonId,
@@ -8018,6 +8060,45 @@ The image must be suitable as a visual consistency reference for future story il
     });
 
     return storybookEntryId;
+  }
+
+  /**
+   * Prepared art is already generated before the child enters a branch. When
+   * the wallet can cover it, entering that branch is the user's implicit use
+   * of the illustration, so unlock it immediately instead of hiding it behind
+   * a redundant second CTA.
+   */
+  private async autoUnlockPreparedIllustrationIfEligible(
+    seasonId: string,
+    episode: Episode,
+    illustrationId: string,
+    entry: StorybookEntry,
+  ) {
+    if (entry.status !== 'locked') {
+      return false;
+    }
+
+    const season = await this.seasonsRepository.findOne({ where: { seasonId } });
+    if (!season) {
+      return false;
+    }
+    const eligibility = await this.getIllustrationCrystalEligibility(season.ownerUserId, seasonId);
+    if (!eligibility.hasEnoughCrystals) {
+      return false;
+    }
+    await this.debitIllustrationUnlockIfNeeded(
+      season.ownerUserId,
+      seasonId,
+      episode.episodeId,
+      episode.episodeNumber,
+      illustrationId,
+    );
+    entry.status = 'ready';
+    entry.metadata = {
+      ...(entry.metadata || {}),
+      autoUnlockedAt: new Date().toISOString(),
+    };
+    return true;
   }
 
   private async isPreparedIllustrationInProgress(
@@ -9552,6 +9633,29 @@ Requirements:
           prepared.payload = { ...(prepared.payload || {}), preparedAudioChunks: nextChunks };
           prepared.updatedAt = new Date();
           await manager.save(PreparedEpisode, prepared);
+
+          // A branch can become the live episode while its exact timestamp
+          // request is still running. Keep that late result visible to the
+          // reader instead of leaving it stranded on the prepared record.
+          const usedEpisodeId = String(prepared.payload?.usedEpisodeId || '');
+          if (usedEpisodeId) {
+            const usedEpisode = await manager.findOne(Episode, {
+              where: { episodeId: usedEpisodeId, seasonId: job.seasonId },
+              lock: { mode: 'pessimistic_write' },
+            });
+            if (usedEpisode) {
+              const usedChunkIndex = (usedEpisode.audioChunks || []).findIndex(
+                (item: any) => item.chunkId === metadata.chunkId && item.audioUrl === metadata.audioUrl,
+              );
+              if (usedChunkIndex >= 0) {
+                usedEpisode.audioChunks = (usedEpisode.audioChunks || []).map((item: any, index: number) =>
+                  index === usedChunkIndex ? { ...item, readingAlignment: alignment } : item,
+                );
+                usedEpisode.updatedAt = new Date();
+                await manager.save(Episode, usedEpisode);
+              }
+            }
+          }
         } else {
           const episode = currentSource as Episode;
           episode.audioChunks = nextChunks;
