@@ -9729,6 +9729,7 @@ Requirements:
     }
 
     let fixedChunks = 0;
+    const alignmentJobsToSchedule: Array<{ jobId: string | null; dryRun: boolean }> = [];
     for (const [preparedEpisodeId, jobs] of jobsByPrepared.entries()) {
       const prepared = await this.preparedEpisodesRepository.findOne({ where: { preparedEpisodeId } });
       if (!prepared) {
@@ -9753,17 +9754,46 @@ Requirements:
         }
 
         const chunk = preparedAudioChunks[chunkIndex];
-        if ((chunk.status === 'ready' || chunk.status === 'ready_dry_run') && chunk.audioUrl) {
+        const durationSeconds = Number(job.result?.durationSeconds || chunk.durationSeconds || 0);
+        const text = String(chunk.text || job.payload?.text || '');
+        const needsMediaRecovery = !['ready', 'ready_dry_run'].includes(String(chunk.status || '')) || !chunk.audioUrl;
+        const needsAlignmentRecovery = Boolean(text) && durationSeconds > 0 && !chunk.readingAlignment;
+        if (!needsMediaRecovery && !needsAlignmentRecovery) {
           continue;
         }
 
-        preparedAudioChunks[chunkIndex] = {
+        const recoveredChunk = {
           ...chunk,
           status: job.status === 'ready_dry_run' ? 'ready_dry_run' : 'ready',
           audioUrl,
+          ...(durationSeconds > 0 ? { durationSeconds } : {}),
         };
+        const nextPreparedAudioChunks = needsAlignmentRecovery
+          ? this.attachEstimatedReadingAlignment(
+              preparedAudioChunks.map((item, index) => index === chunkIndex ? recoveredChunk : item),
+              chunkId,
+              text,
+              audioUrl,
+              durationSeconds,
+            )
+          : preparedAudioChunks.map((item, index) => index === chunkIndex ? recoveredChunk : item);
+        preparedAudioChunks.splice(0, preparedAudioChunks.length, ...nextPreparedAudioChunks);
         changed = true;
         fixedChunks += 1;
+
+        if (needsAlignmentRecovery) {
+          const alignmentJob = await this.enqueueReadingAlignmentJob(this.dataSource.manager, {
+            seasonId,
+            episodeId: null,
+            preparedEpisodeId,
+            chunkId,
+            audioUrl,
+            text,
+            source: 'prepared',
+            dryRun: job.status === 'ready_dry_run',
+          });
+          alignmentJobsToSchedule.push({ jobId: alignmentJob?.jobId || null, dryRun: job.status === 'ready_dry_run' });
+        }
       }
 
       if (changed) {
@@ -9779,6 +9809,9 @@ Requirements:
 
     if (fixedChunks > 0) {
       this.logger.warn(`[PreparedAudio] Reconciled ${fixedChunks} prepared audio chunk(s) for season ${seasonId}`);
+    }
+    for (const alignmentJob of alignmentJobsToSchedule) {
+      this.scheduleReadingAlignment(alignmentJob.jobId, alignmentJob.dryRun);
     }
 
     return fixedChunks;
@@ -9805,6 +9838,7 @@ Requirements:
     }
 
     let fixedChunks = 0;
+    const alignmentJobsToSchedule: Array<{ jobId: string | null; dryRun: boolean }> = [];
     for (const [episodeId, jobs] of jobsByEpisode.entries()) {
       const episode = await this.episodesRepository.findOne({ where: { episodeId, seasonId } });
       if (!episode) {
@@ -9827,17 +9861,45 @@ Requirements:
         }
 
         const chunk = audioChunks[chunkIndex];
-        if ((chunk.status === 'ready' || chunk.status === 'ready_dry_run') && chunk.audioUrl) {
+        const durationSeconds = Number(job.result?.durationSeconds || chunk.durationSeconds || 0);
+        const text = String(chunk.text || job.payload?.text || '');
+        const needsMediaRecovery = !['ready', 'ready_dry_run'].includes(String(chunk.status || '')) || !chunk.audioUrl;
+        const needsAlignmentRecovery = Boolean(text) && durationSeconds > 0 && !chunk.readingAlignment;
+        if (!needsMediaRecovery && !needsAlignmentRecovery) {
           continue;
         }
 
-        audioChunks[chunkIndex] = {
+        const recoveredChunk = {
           ...chunk,
           status: job.status === 'ready_dry_run' ? 'ready_dry_run' : 'ready',
           audioUrl,
+          ...(durationSeconds > 0 ? { durationSeconds } : {}),
         };
+        const nextAudioChunks = needsAlignmentRecovery
+          ? this.attachEstimatedReadingAlignment(
+              audioChunks.map((item, index) => index === chunkIndex ? recoveredChunk : item),
+              chunkId,
+              text,
+              audioUrl,
+              durationSeconds,
+            )
+          : audioChunks.map((item, index) => index === chunkIndex ? recoveredChunk : item);
+        audioChunks.splice(0, audioChunks.length, ...nextAudioChunks);
         changed = true;
         fixedChunks += 1;
+
+        if (needsAlignmentRecovery) {
+          const alignmentJob = await this.enqueueReadingAlignmentJob(this.dataSource.manager, {
+            seasonId,
+            episodeId,
+            chunkId,
+            audioUrl,
+            text,
+            source: 'episode',
+            dryRun: job.status === 'ready_dry_run',
+          });
+          alignmentJobsToSchedule.push({ jobId: alignmentJob?.jobId || null, dryRun: job.status === 'ready_dry_run' });
+        }
       }
 
       if (changed) {
@@ -9850,6 +9912,9 @@ Requirements:
 
     if (fixedChunks > 0) {
       this.logger.warn(`[EpisodeAudio] Reconciled ${fixedChunks} current audio chunk(s) for season ${seasonId}`);
+    }
+    for (const alignmentJob of alignmentJobsToSchedule) {
+      this.scheduleReadingAlignment(alignmentJob.jobId, alignmentJob.dryRun);
     }
 
     return fixedChunks;
