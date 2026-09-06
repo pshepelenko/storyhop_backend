@@ -9757,7 +9757,8 @@ Requirements:
         const durationSeconds = Number(job.result?.durationSeconds || chunk.durationSeconds || 0);
         const text = String(chunk.text || job.payload?.text || '');
         const needsMediaRecovery = !['ready', 'ready_dry_run'].includes(String(chunk.status || '')) || !chunk.audioUrl;
-        const needsAlignmentRecovery = Boolean(text) && durationSeconds > 0 && !chunk.readingAlignment;
+        const needsAlignmentRecovery =
+          needsMediaRecovery && Boolean(text) && durationSeconds > 0 && !chunk.readingAlignment;
         if (!needsMediaRecovery && !needsAlignmentRecovery) {
           continue;
         }
@@ -9864,7 +9865,8 @@ Requirements:
         const durationSeconds = Number(job.result?.durationSeconds || chunk.durationSeconds || 0);
         const text = String(chunk.text || job.payload?.text || '');
         const needsMediaRecovery = !['ready', 'ready_dry_run'].includes(String(chunk.status || '')) || !chunk.audioUrl;
-        const needsAlignmentRecovery = Boolean(text) && durationSeconds > 0 && !chunk.readingAlignment;
+        const needsAlignmentRecovery =
+          needsMediaRecovery && Boolean(text) && durationSeconds > 0 && !chunk.readingAlignment;
         if (!needsMediaRecovery && !needsAlignmentRecovery) {
           continue;
         }

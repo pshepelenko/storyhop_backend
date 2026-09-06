@@ -80,6 +80,49 @@ describe('SeasonsService prepared episode media', () => {
     expect(liveChunk.durationSeconds).toBe(2.5);
   });
 
+  it('does not backfill alignment for an already ready prepared chunk', async () => {
+    const service = Object.create(SeasonsService.prototype) as Record<string, any>;
+    const prepared = {
+      preparedEpisodeId: 'prepared-1',
+      status: 'ready',
+      payload: {
+        preparedAudioChunks: [{
+          chunkId: 'chunk-1',
+          type: 'chapter',
+          text: 'A short line.',
+          status: 'ready',
+          audioUrl: 'https://storage.example/chunk.mp3',
+          durationSeconds: 2.5,
+        }],
+      },
+    };
+    service.generationJobsRepository = {
+      find: jest.fn().mockResolvedValue([{
+        jobType: 'prepared_tts_chunk',
+        status: 'ready',
+        seasonId: 'season-1',
+        payload: { text: 'A short line.', metadata: { preparedEpisodeId: 'prepared-1', chunkId: 'chunk-1' } },
+        result: { chunkId: 'chunk-1', audioUrl: 'https://storage.example/chunk.mp3', durationSeconds: 2.5 },
+      }]),
+    };
+    service.preparedEpisodesRepository = {
+      findOne: jest.fn().mockResolvedValue(prepared),
+      save: jest.fn(),
+    };
+    service.readingAlignment = { buildEstimated: jest.fn() };
+    service.logger = { warn: jest.fn() };
+    service.dataSource = { manager: {} };
+    service.enqueueReadingAlignmentJob = jest.fn();
+    service.scheduleReadingAlignment = jest.fn();
+
+    await expect(service.reconcilePreparedAudioChunksForSeason('season-1')).resolves.toBe(0);
+
+    expect(service.preparedEpisodesRepository.save).not.toHaveBeenCalled();
+    expect(service.readingAlignment.buildEstimated).not.toHaveBeenCalled();
+    expect(service.enqueueReadingAlignmentJob).not.toHaveBeenCalled();
+    expect(service.scheduleReadingAlignment).not.toHaveBeenCalled();
+  });
+
   it('automatically unlocks prepared art exactly once when the wallet can cover it', async () => {
     const service = Object.create(SeasonsService.prototype) as Record<string, any>;
     service.seasonsRepository = { findOne: jest.fn().mockResolvedValue({ ownerUserId: 'owner-1' }) };
