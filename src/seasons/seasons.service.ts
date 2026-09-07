@@ -2077,12 +2077,62 @@ export class SeasonsService {
     return !sourceWords.slice(1).some((word) => /^[A-Z][a-z]{2,}[,.!?]?$/.test(word));
   }
 
+  private getSpeakingVocabularyTerms(vocabulary: unknown): string[] {
+    const entries = Array.isArray(vocabulary) ? vocabulary : [];
+    const newTerms = entries
+      .filter((item: any) => String(item?.exposureType || '').trim().toLowerCase() === 'new')
+      .map((item: any) => String(item?.term || '').trim())
+      .filter(Boolean);
+
+    return [...new Set(newTerms.map((term) => this.normalizeSpeakingPhraseKey(term)).filter(Boolean))];
+  }
+
+  private normalizeSpeakingWord(word: string): string {
+    const normalized = word.toLowerCase().replace(/'/g, '').trim();
+    if (normalized.length <= 3) {
+      return normalized;
+    }
+    if (normalized.endsWith('ies') && normalized.length > 4) {
+      return `${normalized.slice(0, -3)}y`;
+    }
+    if (normalized.endsWith('ied') && normalized.length > 4) {
+      return `${normalized.slice(0, -3)}y`;
+    }
+    if (normalized.endsWith('ing') && normalized.length > 5) {
+      const stem = normalized.slice(0, -3);
+      return stem.length > 3 && stem[stem.length - 1] === stem[stem.length - 2] ? stem.slice(0, -1) : stem;
+    }
+    if (normalized.endsWith('ed') && normalized.length > 4) {
+      return normalized.slice(0, -2);
+    }
+    if (normalized.endsWith('es') && normalized.length > 4) {
+      return normalized.slice(0, -2);
+    }
+    if (normalized.endsWith('s') && normalized.length > 3) {
+      return normalized.slice(0, -1);
+    }
+    return normalized;
+  }
+
+  private phraseContainsVocabularyTerm(phrase: string, normalizedTerm: string): boolean {
+    const phraseWords = this.getSpeakableWords(phrase).map((word) => this.normalizeSpeakingWord(word));
+    const termWords = this.getSpeakableWords(normalizedTerm).map((word) => this.normalizeSpeakingWord(word));
+    if (!phraseWords.length || !termWords.length) {
+      return false;
+    }
+
+    return termWords.every((termWord) => phraseWords.includes(termWord));
+  }
+
   private pickUniqueSpeakingPrompt(
     chapterText: string,
     requestedPrompt: string,
     usedPhraseKeys: Set<string>,
+    vocabulary: unknown = [],
   ): string | null {
     const chapterCandidates = this.getSpeakingPromptCandidates(chapterText);
+    const vocabularyTerms = this.getSpeakingVocabularyTerms(vocabulary);
+    const requiresNewVocabulary = Array.isArray(vocabulary);
     const requestedKey = this.normalizeSpeakingPhraseKey(requestedPrompt);
     const requestedCandidate = chapterCandidates.find(
       (candidate) => this.normalizeSpeakingPhraseKey(candidate) === requestedKey,
@@ -2092,7 +2142,15 @@ export class SeasonsService {
 
     for (const candidate of candidates) {
       const key = this.normalizeSpeakingPhraseKey(candidate);
-      if (!key || seen.has(key) || usedPhraseKeys.has(key)) {
+      if (
+        !key ||
+        seen.has(key) ||
+        usedPhraseKeys.has(key) ||
+        (requiresNewVocabulary && (
+          vocabularyTerms.length === 0 ||
+          !vocabularyTerms.some((term) => this.phraseContainsVocabularyTerm(candidate, term))
+        ))
+      ) {
         continue;
       }
       seen.add(key);
@@ -2148,6 +2206,7 @@ export class SeasonsService {
       String(episodeContent.chapterText || ''),
       String(episodeContent.speakingPrompt || ''),
       usedPhraseKeys,
+      episodeContent.highlightedVocabulary,
     );
 
     if (!speakingPrompt) {
@@ -2181,26 +2240,22 @@ export class SeasonsService {
   }
 
   private speechMatchesTarget(targetPhrase: string, transcript: string): boolean {
-    const targetWords = this.getSpeakableWords(targetPhrase);
-    const spokenWords = this.getSpeakableWords(transcript);
-    if (targetWords.length === 0 || spokenWords.length === 0) {
+    const stopWords = new Set([
+      'a', 'an', 'and', 'are', 'at', 'be', 'but', 'can', 'do', 'for', 'from', 'i', 'in', 'is', 'it', 'let', 'my', 'not', 'of', 'on', 'or', 'please', 'the', 'this', 'to', 'we', 'with', 'you', 'your',
+    ]);
+    const targetWords = [...new Set(
+      this.getSpeakableWords(targetPhrase)
+        .map((word) => this.normalizeSpeakingWord(word))
+        .filter((word) => word.length > 1 && !stopWords.has(word)),
+    )];
+    const spokenWords = new Set(this.getSpeakableWords(transcript).map((word) => this.normalizeSpeakingWord(word)));
+    if (targetWords.length === 0 || spokenWords.size === 0) {
       return false;
     }
 
-    let spokenIndex = 0;
-    let matchedCount = 0;
-
-    for (const targetWord of targetWords) {
-      while (spokenIndex < spokenWords.length && spokenWords[spokenIndex] !== targetWord) {
-        spokenIndex += 1;
-      }
-      if (spokenIndex < spokenWords.length && spokenWords[spokenIndex] === targetWord) {
-        matchedCount += 1;
-        spokenIndex += 1;
-      }
-    }
-
-    return matchedCount / targetWords.length >= 0.75;
+    const matchedCount = targetWords.filter((word) => spokenWords.has(word)).length;
+    const requiredMatches = targetWords.length <= 2 ? 1 : Math.ceil(targetWords.length / 2);
+    return matchedCount >= requiredMatches;
   }
 
   async getSeason(
@@ -6071,6 +6126,7 @@ The image must be suitable as a visual consistency reference for future story il
           String(result?.chapterText || ''),
           String(result?.speakingPrompt || ''),
           usedPhraseKeys,
+          result?.highlightedVocabulary,
         );
 
         if (uniquePrompt) {
