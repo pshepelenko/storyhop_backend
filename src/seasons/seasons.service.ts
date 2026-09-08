@@ -86,6 +86,7 @@ const ILLUSTRATION_UPLOAD_MAX_ATTEMPTS = 2;
 const PREPARED_ILLUSTRATION_MODERATION_MAX_ATTEMPTS = 3;
 const STALE_PROCESSING_JOB_TIMEOUT_MS = 3 * 60 * 1000;
 const GENERATION_JOB_MAX_AGE_MS = 20 * 60 * 1000;
+const SEASON_BOOTSTRAP_JOB_MAX_AGE_MS = 40 * 60 * 1000;
 const GENERATION_JOB_MAX_ATTEMPTS = 3;
 const GENERATION_JOB_RETRY_COOLDOWN_MS = 45 * 1000;
 const PREPARED_ILLUSTRATION_WAIT_TIMEOUT_MS = 120 * 1000;
@@ -393,25 +394,58 @@ export class SeasonsService {
   private async generateSeasonFrameworkStack(
     season: Season,
     seasonFramework: SeasonFramework,
+    onStage?: (stage: 'framework' | 'season_bible' | 'episode_outline' | 'finalizing') => Promise<void>,
   ) {
     const protagonist = this.buildSeasonProtagonistContext(season);
     const targetAudience = this.buildSeasonTargetAudience(season, protagonist);
-    let framework = await this.generateStrategicSeasonFramework(protagonist, targetAudience, season.seasonSetup);
+    let framework = seasonFramework.framework || {};
     let validation = validateSeasonFramework(framework);
+
     if (!validation.valid) {
-      console.warn(`Framework validation failed (${validation.issues.join('; ')}), retrying...`);
-      const retryFramework = await this.generateStrategicSeasonFramework(protagonist, targetAudience, season.seasonSetup);
-      const retryValidation = validateSeasonFramework(retryFramework);
-      if (retryValidation.valid) {
-        framework = retryFramework;
-        validation = retryValidation;
-      } else {
-        throw new Error(`Framework retry failed validation: ${retryValidation.issues.join('; ')}`);
+      await onStage?.('framework');
+      framework = await this.generateStrategicSeasonFramework(protagonist, targetAudience, season.seasonSetup);
+      validation = validateSeasonFramework(framework);
+      if (!validation.valid) {
+        console.warn(`Framework validation failed (${validation.issues.join('; ')}), retrying...`);
+        const retryFramework = await this.generateStrategicSeasonFramework(protagonist, targetAudience, season.seasonSetup);
+        const retryValidation = validateSeasonFramework(retryFramework);
+        if (retryValidation.valid) {
+          framework = retryFramework;
+          validation = retryValidation;
+        } else {
+          throw new Error(`Framework retry failed validation: ${retryValidation.issues.join('; ')}`);
+        }
       }
+
+      // Persist each completed stage. A retry can continue from this point without
+      // regenerating a valid framework or creating another season shell.
+      seasonFramework.framework = framework;
+      seasonFramework.generationStatus = 'processing';
+      seasonFramework.updatedAt = new Date();
+      await this.seasonFrameworksRepository.save(seasonFramework);
     }
 
-    const seasonBible = await this.generateSeasonBible(protagonist, season.seasonSetup, framework);
-    const episodeOutline = await this.generateEpisodeOutline(framework, seasonBible);
+    let seasonBible = seasonFramework.seasonBible || {};
+    if (!Object.keys(seasonBible).length) {
+      await onStage?.('season_bible');
+      seasonBible = await this.generateSeasonBible(protagonist, season.seasonSetup, framework);
+      seasonFramework.seasonBible = seasonBible;
+      seasonFramework.generationStatus = 'processing';
+      seasonFramework.updatedAt = new Date();
+      await this.seasonFrameworksRepository.save(seasonFramework);
+    }
+
+    let episodeOutline = seasonFramework.episodeOutline || {};
+    if (!Array.isArray(episodeOutline.episodes) || !episodeOutline.episodes.length) {
+      await onStage?.('episode_outline');
+      episodeOutline = await this.generateEpisodeOutline(framework, seasonBible);
+      seasonFramework.episodeOutline = episodeOutline;
+      seasonFramework.generationStatus = 'processing';
+      seasonFramework.updatedAt = new Date();
+      await this.seasonFrameworksRepository.save(seasonFramework);
+    }
+
+    await onStage?.('finalizing');
 
     season.storyState = {
       ...this.buildInitialStoryState(protagonist, season.seasonSetup, framework),
@@ -421,9 +455,6 @@ export class SeasonsService {
     season.updatedAt = new Date();
     await this.seasonsRepository.save(season);
 
-    seasonFramework.framework = framework;
-    seasonFramework.seasonBible = seasonBible;
-    seasonFramework.episodeOutline = episodeOutline;
     seasonFramework.generationStatus = 'ready';
     seasonFramework.updatedAt = new Date();
     await this.seasonFrameworksRepository.save(seasonFramework);
@@ -1385,23 +1416,92 @@ export class SeasonsService {
       throw new Error('Season framework not found');
     }
 
-    if (seasonFramework.generationStatus === 'processing') {
-      return this.getSeason(seasonId);
+    await this.enqueueSeasonBootstrapJob(season, seasonFramework);
+    return this.getSeason(seasonId);
+  }
+
+  private async enqueueSeasonBootstrapJob(season: Season, seasonFramework: SeasonFramework) {
+    const activeJob = await this.generationJobsRepository.findOne({
+      where: [
+        { seasonId: season.seasonId, jobType: 'season_bootstrap', status: 'pending' },
+        { seasonId: season.seasonId, jobType: 'season_bootstrap', status: 'processing' },
+      ],
+      order: { createdAt: 'DESC' },
+    });
+    if (activeJob) return activeJob;
+
+    const latestJob = await this.generationJobsRepository.findOne({
+      where: { seasonId: season.seasonId, jobType: 'season_bootstrap' },
+      order: { createdAt: 'DESC' },
+    });
+    if (seasonFramework.generationStatus === 'ready' && season.status === 'episode_ready') {
+      return latestJob;
     }
+
+    const now = new Date();
+    const retryCount = Number(latestJob?.payload?.retryCount || 0) + (latestJob ? 1 : 0);
+    const job = this.generationJobsRepository.create({
+      jobId: uuidv4(),
+      seasonId: season.seasonId,
+      episodeId: null,
+      jobType: 'season_bootstrap',
+      status: 'pending',
+      payload: {
+        stage: this.getSeasonBootstrapStage(seasonFramework),
+        retryCount,
+        lifecycle: { rootCreatedAt: now.toISOString(), attempt: 0 },
+      },
+      result: {},
+      error: null,
+      promptVersion: PROMPT_VERSION,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await this.generationJobsRepository.save(job);
+
+    if (seasonFramework.generationStatus !== 'ready') {
+      seasonFramework.generationStatus = 'pending';
+      seasonFramework.updatedAt = now;
+      await this.seasonFrameworksRepository.save(seasonFramework);
+    }
+    this.logPipelineStep('season_bootstrap_queued', {
+      seasonId: season.seasonId,
+      jobId: job.jobId,
+      stage: job.payload.stage,
+      retryCount,
+    });
+    return job;
+  }
+
+  private getSeasonBootstrapStage(seasonFramework: SeasonFramework): 'framework' | 'season_bible' | 'episode_outline' | 'hero' | 'first_episode' {
+    if (!validateSeasonFramework(seasonFramework.framework || {}).valid) return 'framework';
+    if (!Object.keys(seasonFramework.seasonBible || {}).length) return 'season_bible';
+    if (!Array.isArray(seasonFramework.episodeOutline?.episodes) || !seasonFramework.episodeOutline.episodes.length) {
+      return 'episode_outline';
+    }
+    return 'hero';
+  }
+
+  private async runSeasonBootstrap(seasonId: string, onStage?: (stage: string) => Promise<void>) {
+    let season = await this.seasonsRepository.findOne({ where: { seasonId } });
+    if (!season) throw new Error('Season not found');
+    let seasonFramework = await this.seasonFrameworksRepository.findOne({ where: { seasonId } });
+    if (!seasonFramework) throw new Error('Season framework not found');
 
     if (seasonFramework.generationStatus !== 'ready') {
       seasonFramework.generationStatus = 'processing';
       seasonFramework.updatedAt = new Date();
       await this.seasonFrameworksRepository.save(seasonFramework);
-      await this.generateSeasonFrameworkStack(season, seasonFramework);
+      await this.generateSeasonFrameworkStack(season, seasonFramework, async (stage) => onStage?.(stage));
       seasonFramework = await this.seasonFrameworksRepository.findOne({ where: { seasonId } });
-      if (!seasonFramework) {
-        throw new Error('Season framework not found');
-      }
+      if (!seasonFramework) throw new Error('Season framework not found');
+      season = await this.seasonsRepository.findOne({ where: { seasonId } });
+      if (!season) throw new Error('Season not found');
     }
 
     const pendingPrefs = season.storyState?.pendingHeroPreferences;
     if (pendingPrefs && season.status === 'framework_ready') {
+      await onStage?.('hero');
       await this.generateHero(seasonId, pendingPrefs);
       season.storyState = { ...season.storyState, pendingHeroPreferences: null };
       await this.seasonsRepository.save(season);
@@ -1418,6 +1518,7 @@ export class SeasonsService {
     if (existingHero) {
       const episodes = await this.episodesRepository.find({ where: { seasonId } });
       if (episodes.length === 0) {
+        await onStage?.('first_episode');
         return this.generateFirstEpisode(seasonId);
       }
     }
@@ -2429,12 +2530,19 @@ export class SeasonsService {
           })
         : [];
     const bonusPracticeState = await this.getOrCreateBonusPracticeState(season);
+    // GET must be observational. Generating defaults here made the creating
+    // screen's polling path issue a second LLM request before bootstrap was ready.
     const heroDraftDefaults = hero?.heroPreferences
-      ? hero.heroPreferences
-      : await this.getOrCreateHeroDraftDefaults(season, framework.framework, framework.seasonBible);
+      || season.storyState?.heroDraftDefaults
+      || null;
     const bonusPracticeSummary = await this.buildBonusPracticeSummary(season, bonusPracticeState, 'story');
 
-    void this.ensureSeasonVisualAssetsInBackground(seasonId);
+    // A creating season has neither a confirmed framework nor a hero yet. Do
+    // not let the creating page's polling loop turn that expected state into
+    // repeated visual-backfill attempts and log noise.
+    if (hero && framework.generationStatus === 'ready') {
+      void this.ensureSeasonVisualAssetsInBackground(seasonId);
+    }
 
     const frameworkLite = {
       seasonPremise: framework.framework?.seasonPremise || null,
@@ -2562,6 +2670,7 @@ export class SeasonsService {
           illustrationId: job.payload?.illustrationId || null,
           storybookEntryId: job.payload?.storybookEntryId || null,
           nextEpisodeNumber: job.payload?.nextEpisodeNumber || null,
+          stage: job.payload?.stage || null,
           promptPayload: job.payload?.promptPayload
             ? {
                 episodeNumber: job.payload.promptPayload.episodeNumber,
@@ -4038,6 +4147,7 @@ export class SeasonsService {
     const results = [];
     const dryRun = Boolean(options.dryRun);
     const contentJobTypes = new Set([
+      'season_bootstrap',
       'episode_choice_generation',
       'prepared_branch_plan',
       'prepared_episode_prose',
@@ -4081,6 +4191,9 @@ export class SeasonsService {
     };
 
     const typePriority: Record<string, number> = {
+      // A newly confirmed season is visible immediately and must not sit behind
+      // speculative prepared content from an older season.
+      season_bootstrap: -2,
       // A confirmed choice is user-visible work and must outrank speculative prefetch.
       episode_choice_generation: -1,
       // Live current-episode media first (critical path for reading UX)
@@ -4133,6 +4246,9 @@ export class SeasonsService {
     };
 
     const executeJob = async (job: GenerationJob) => {
+      if (job.jobType === 'season_bootstrap') {
+        return this.processSeasonBootstrapJob(job);
+      }
       if (job.jobType === 'episode_choice_generation') {
         return this.processEpisodeChoiceGenerationJob(job, dryRun);
       }
@@ -6958,6 +7074,86 @@ The image must be suitable as a visual consistency reference for future story il
     return true;
   }
 
+  private async processSeasonBootstrapJob(job: GenerationJob) {
+    const claimed = await this.claimPendingJob(job);
+    if (!claimed) return { jobId: job.jobId, status: 'skipped' };
+
+    const setStage = async (stage: string) => {
+      job.payload = {
+        ...(job.payload || {}),
+        stage,
+        stageStartedAt: new Date().toISOString(),
+      };
+      job.updatedAt = new Date();
+      await this.generationJobsRepository.save(job);
+      this.logPipelineStep('season_bootstrap_stage_started', {
+        seasonId: job.seasonId,
+        jobId: job.jobId,
+        stage,
+      });
+    };
+
+    let lastError: unknown = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        await this.runSeasonBootstrap(job.seasonId, setStage);
+        job.status = 'ready';
+        job.result = { stage: 'complete' };
+        job.error = null;
+        job.updatedAt = new Date();
+        await this.generationJobsRepository.save(job);
+        this.logPipelineStep('season_bootstrap_ready', {
+          seasonId: job.seasonId,
+          jobId: job.jobId,
+        });
+        return { jobId: job.jobId, status: job.status, seasonId: job.seasonId };
+      } catch (error) {
+        lastError = error;
+        if (!this.isRetryableOpenRouterError(error) || attempt === 2) break;
+        job.payload = {
+          ...(job.payload || {}),
+          retryAttempt: attempt,
+          retryingAt: new Date().toISOString(),
+        };
+        job.updatedAt = new Date();
+        await this.generationJobsRepository.save(job);
+        this.logger.warn(
+          `[SeasonBootstrap] retrying seasonId=${job.seasonId} jobId=${job.jobId} attempt=${attempt + 1}/2 | ${this.formatGenerationError(error)}`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 1500 * attempt));
+      }
+    }
+
+    {
+      const error = lastError;
+      const formatted = this.formatGenerationError(error);
+      const seasonFramework = await this.seasonFrameworksRepository.findOne({ where: { seasonId: job.seasonId } });
+      if (seasonFramework) {
+        seasonFramework.generationStatus = 'failed';
+        seasonFramework.updatedAt = new Date();
+        await this.seasonFrameworksRepository.save(seasonFramework);
+      }
+      job.status = 'failed';
+      job.error = formatted;
+      job.payload = {
+        ...(job.payload || {}),
+        failedAt: new Date().toISOString(),
+      };
+      job.updatedAt = new Date();
+      await this.generationJobsRepository.save(job);
+      this.logPipelineStep('season_bootstrap_failed', {
+        seasonId: job.seasonId,
+        jobId: job.jobId,
+        stage: job.payload?.stage || 'unknown',
+        error: formatted,
+      });
+      this.logger.error(
+        `[SeasonBootstrap] failed seasonId=${job.seasonId} jobId=${job.jobId} stage=${job.payload?.stage || 'unknown'} | ${formatted}`,
+      );
+      return { jobId: job.jobId, status: job.status, error: job.error };
+    }
+  }
+
   private async processSeasonTitleJob(job: GenerationJob, dryRun: boolean) {
     const claimed = await this.claimPendingJob(job);
     if (!claimed) {
@@ -7618,7 +7814,7 @@ The image must be suitable as a visual consistency reference for future story il
           break;
         } catch (error) {
           lastError = error;
-          if (!this.isRetryablePreparedEpisodeProseError(error) || attempt >= PREPARED_EPISODE_PROSE_MAX_ATTEMPTS) {
+          if (!this.isRetryableOpenRouterError(error) || attempt >= PREPARED_EPISODE_PROSE_MAX_ATTEMPTS) {
             break;
           }
 
@@ -9167,7 +9363,13 @@ Requirements:
   }
 
   private isGenerationJobExpired(job: GenerationJob, now = Date.now()) {
-    return now - this.getJobLifecycle(job).rootCreatedAt.getTime() >= GENERATION_JOB_MAX_AGE_MS;
+    return now - this.getJobLifecycle(job).rootCreatedAt.getTime() >= this.getGenerationJobMaxAgeMs(job);
+  }
+
+  private getGenerationJobMaxAgeMs(job: GenerationJob) {
+    return job.jobType === 'season_bootstrap'
+      ? SEASON_BOOTSTRAP_JOB_MAX_AGE_MS
+      : GENERATION_JOB_MAX_AGE_MS;
   }
 
   private canScheduleRetry(history: GenerationJob[], now = Date.now()) {
@@ -9205,7 +9407,7 @@ Requirements:
       }
 
       job.status = 'expired';
-      job.error = `Generation job expired after ${Math.round(GENERATION_JOB_MAX_AGE_MS / 60000)} minutes`;
+      job.error = `Generation job expired after ${Math.round(this.getGenerationJobMaxAgeMs(job) / 60000)} minutes`;
       job.updatedAt = new Date();
       await this.generationJobsRepository.save(job);
       if (job.jobType === 'image_generation') {
@@ -9232,7 +9434,7 @@ Requirements:
     if (this.isGenerationJobExpired(job) || lifecycle.attempt >= GENERATION_JOB_MAX_ATTEMPTS) {
       job.status = this.isGenerationJobExpired(job) ? 'expired' : 'failed';
       job.error = this.isGenerationJobExpired(job)
-        ? `Generation job expired after ${Math.round(GENERATION_JOB_MAX_AGE_MS / 60000)} minutes`
+        ? `Generation job expired after ${Math.round(this.getGenerationJobMaxAgeMs(job) / 60000)} minutes`
         : `Generation job retry limit reached (${GENERATION_JOB_MAX_ATTEMPTS} attempts)`;
       job.updatedAt = new Date();
       await this.generationJobsRepository.save(job);
@@ -10082,7 +10284,7 @@ Requirements:
     return enqueued;
   }
 
-  private isRetryablePreparedEpisodeProseError(error: any) {
+  private isRetryableOpenRouterError(error: any) {
     const code = String(error?.code || error?.cause?.code || '').toUpperCase();
     const status = Number(error?.response?.status || 0);
     const message = String(error?.message || '').toLowerCase();
@@ -10091,7 +10293,19 @@ Requirements:
       return true;
     }
 
-    if (status === 429 || message.includes('rate limit')) {
+    if (status === 429 || status >= 500 || message.includes('rate limit')) {
+      return true;
+    }
+
+    // OpenRouter can return an empty or malformed body while the upstream
+    // request itself succeeds. The JSON repair route is attempted first by
+    // OpenRouterService; retry the bootstrap job once when that still fails.
+    if (
+      message.includes('invalid json') ||
+      message.includes('empty response') ||
+      message.includes('incomplete response') ||
+      message.includes('unexpected end of json')
+    ) {
       return true;
     }
 
