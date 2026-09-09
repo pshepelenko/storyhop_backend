@@ -1,12 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { SeasonsService } from '../seasons/seasons.service';
+import { LlmDiagnosticsService } from '../llm-diagnostics/llm-diagnostics.service';
 
 @Injectable()
 export class WorkerService {
   private running = false;
   private intervalMs = 10000;
+  private lastDiagnosticsPurgeAt = 0;
 
-  constructor(private readonly seasonsService: SeasonsService) {}
+  constructor(
+    private readonly seasonsService: SeasonsService,
+    private readonly llmDiagnostics: LlmDiagnosticsService,
+  ) {}
 
   async processAllPendingJobs(): Promise<{ processed: number; reconciled: number }> {
     if (this.running) {
@@ -15,6 +20,10 @@ export class WorkerService {
     this.running = true;
 
     try {
+      if (Date.now() - this.lastDiagnosticsPurgeAt >= 24 * 60 * 60 * 1000) {
+        await this.llmDiagnostics.purgeExpired();
+        this.lastDiagnosticsPurgeAt = Date.now();
+      }
       const reconciled = await this.seasonsService.reconcileStaleIllustrationUnlocks();
       const seasons = await this.seasonsService.getAllSeasonsForProcessing();
       let processed = 0;

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { OpenRouterService } from './openrouter.service';
+import { OpenRouterEmptyContentError, OpenRouterService } from './openrouter.service';
 
 jest.mock('axios');
 
@@ -7,6 +7,9 @@ describe('OpenRouterService image generation', () => {
   const mockedAxios = axios as jest.Mocked<typeof axios>;
   const logger = {
     logOpenRouterError: jest.fn(),
+    logInvalidLlmResponse: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
   };
   const prompts = {};
   const originalEnv = { ...process.env };
@@ -110,5 +113,51 @@ describe('OpenRouterService image generation', () => {
       expect.stringContaining('primary'),
       expect.any(Error),
     );
+  });
+});
+
+describe('OpenRouterService season framework completions', () => {
+  const mockedAxios = axios as jest.Mocked<typeof axios>;
+  const logger = {
+    warn: jest.fn(),
+    error: jest.fn(),
+    logOpenRouterError: jest.fn(),
+    logInvalidLlmResponse: jest.fn(),
+  } as any;
+  const prompts = { buildPrompt: jest.fn() } as any;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.OPEN_ROUTER_API_KEY = 'test-key';
+    process.env.OPENROUTER_SEASON_MODEL = 'deepseek/deepseek-v4-pro-0813';
+  });
+
+  it('surfaces an empty season completion before JSON repair and preserves safe response metadata', async () => {
+    mockedAxios.post.mockResolvedValue({
+      status: 200,
+      data: {
+        id: 'gen-test',
+        provider: 'Novita',
+        usage: { total_tokens: 123, total_cost: 0.01 },
+        choices: [{ finish_reason: 'stop', message: { content: '', reasoning: 'private reasoning' } }],
+      },
+    } as any);
+    const onFailure = jest.fn();
+    const service = new OpenRouterService(logger, prompts);
+
+    await expect(service.generateSeasonJson('system', 'user', {
+      throwOnEmptyContent: true,
+      onFailure,
+    })).rejects.toBeInstanceOf(OpenRouterEmptyContentError);
+
+    expect(onFailure).toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'empty_content',
+      model: 'deepseek/deepseek-v4-pro-0813',
+      actualProvider: 'Novita',
+      responseId: 'gen-test',
+      finishReason: 'stop',
+      usage: { total_tokens: 123, total_cost: 0.01 },
+    }));
+    expect(prompts.buildPrompt).not.toHaveBeenCalled();
   });
 });

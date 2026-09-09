@@ -2,7 +2,12 @@ import { HttpException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
-import { JsonGenerationOptions, OpenRouterService } from '../openrouter/openrouter.service';
+import {
+  JsonGenerationOptions,
+  OpenRouterEmptyContentError,
+  OpenRouterJsonFailure,
+  OpenRouterService,
+} from '../openrouter/openrouter.service';
 import { StorageService } from '../storage/storage.service';
 import { AudioMetadataService } from '../audio-metadata/audio-metadata.service';
 import { ReadingAlignment, ReadingAlignmentService } from '../reading-alignment/reading-alignment.service';
@@ -27,6 +32,8 @@ import { ChildProfile } from '../users/entities/child-profile.entity';
 import { SeasonCharactersService } from './tti/season-characters.service';
 import { TtiPromptService } from './tti/tti-prompt.service';
 import { FileLogger } from '../logging/file-logger.service';
+import { LlmDiagnosticsService } from '../llm-diagnostics/llm-diagnostics.service';
+import { ProductAnalyticsService } from '../analytics/product-analytics.service';
 import { getStoryWorldPreset } from './story-worlds';
 import {
   buildVocabularyTarget,
@@ -96,6 +103,12 @@ const BONUS_RECAP_SIZE = 3;
 const BONUS_STORY_RECAP_COOLDOWN_EPISODES = 10;
 const WRITING_PRACTICE_WORD_COUNT = 4;
 const WRITING_PRACTICE_COOLDOWN_EPISODES = 5;
+const SEASON_EMPTY_RESPONSE_FALLBACK_MODEL = 'qwen/qwen3.8-2.4t-a95b';
+
+type SeasonFrameworkDiagnosticContext = {
+  jobId?: string;
+  attempt: number;
+};
 
 type ActiveGenerationJobForWorker = Pick<GenerationJob, 'seasonId' | 'jobType' | 'createdAt'>;
 
@@ -249,6 +262,8 @@ export class SeasonsService {
     private readonly readingAlignment: ReadingAlignmentService,
     private readonly prompts: PromptsService,
     private readonly logger: FileLogger,
+    private readonly llmDiagnostics: LlmDiagnosticsService,
+    private readonly analytics: ProductAnalyticsService,
   ) {}
 
   async startSeason(payload: StartSeasonPayload) {
@@ -395,6 +410,7 @@ export class SeasonsService {
     season: Season,
     seasonFramework: SeasonFramework,
     onStage?: (stage: 'framework' | 'season_bible' | 'episode_outline' | 'finalizing') => Promise<void>,
+    diagnosticContext: SeasonFrameworkDiagnosticContext = { attempt: 1 },
   ) {
     const protagonist = this.buildSeasonProtagonistContext(season);
     const targetAudience = this.buildSeasonTargetAudience(season, protagonist);
@@ -403,16 +419,32 @@ export class SeasonsService {
 
     if (!validation.valid) {
       await onStage?.('framework');
-      framework = await this.generateStrategicSeasonFramework(protagonist, targetAudience, season.seasonSetup);
+      const generated = await this.generateStrategicSeasonFramework(
+        season,
+        protagonist,
+        targetAudience,
+        season.seasonSetup,
+        diagnosticContext,
+      );
+      framework = generated.framework;
       validation = validateSeasonFramework(framework);
       if (!validation.valid) {
+        await this.recordFrameworkValidationFailure(season, diagnosticContext, generated.model, framework, validation.issues);
         console.warn(`Framework validation failed (${validation.issues.join('; ')}), retrying...`);
-        const retryFramework = await this.generateStrategicSeasonFramework(protagonist, targetAudience, season.seasonSetup);
+        const retryGenerated = await this.generateStrategicSeasonFramework(
+          season,
+          protagonist,
+          targetAudience,
+          season.seasonSetup,
+          diagnosticContext,
+        );
+        const retryFramework = retryGenerated.framework;
         const retryValidation = validateSeasonFramework(retryFramework);
         if (retryValidation.valid) {
           framework = retryFramework;
           validation = retryValidation;
         } else {
+          await this.recordFrameworkValidationFailure(season, diagnosticContext, retryGenerated.model, retryFramework, retryValidation.issues);
           throw new Error(`Framework retry failed validation: ${retryValidation.issues.join('; ')}`);
         }
       }
@@ -1482,7 +1514,11 @@ export class SeasonsService {
     return 'hero';
   }
 
-  private async runSeasonBootstrap(seasonId: string, onStage?: (stage: string) => Promise<void>) {
+  private async runSeasonBootstrap(
+    seasonId: string,
+    onStage?: (stage: string) => Promise<void>,
+    diagnosticContext: SeasonFrameworkDiagnosticContext = { attempt: 1 },
+  ) {
     let season = await this.seasonsRepository.findOne({ where: { seasonId } });
     if (!season) throw new Error('Season not found');
     let seasonFramework = await this.seasonFrameworksRepository.findOne({ where: { seasonId } });
@@ -1492,7 +1528,12 @@ export class SeasonsService {
       seasonFramework.generationStatus = 'processing';
       seasonFramework.updatedAt = new Date();
       await this.seasonFrameworksRepository.save(seasonFramework);
-      await this.generateSeasonFrameworkStack(season, seasonFramework, async (stage) => onStage?.(stage));
+      await this.generateSeasonFrameworkStack(
+        season,
+        seasonFramework,
+        async (stage) => onStage?.(stage),
+        diagnosticContext,
+      );
       seasonFramework = await this.seasonFrameworksRepository.findOne({ where: { seasonId } });
       if (!seasonFramework) throw new Error('Season framework not found');
       season = await this.seasonsRepository.findOne({ where: { seasonId } });
@@ -5861,7 +5902,7 @@ The image should make ${childName}'s season feel personal, magical, and immediat
     );
   }
 
-  private async generateStrategicSeasonFramework(
+  private buildStrategicSeasonFrameworkPrompt(
     protagonist: Record<string, any>,
     targetAudience: Record<string, any>,
     seasonSetup: Record<string, any>,
@@ -5897,11 +5938,148 @@ The image should make ${childName}'s season feel personal, magical, and immediat
       preferredTone: seasonSetup.preferredTone || '',
     });
 
-    return this.generateSeasonJson(
-      `${system}\n- The inciting incident and premise must be unique to the chosen world and setting. Do NOT use generic tropes like fog, mysterious sleep, characters randomly falling asleep, or waking up from a dream.`,
+    return {
+      system: `${system}\n- The inciting incident and premise must be unique to the chosen world and setting. Do NOT use generic tropes like fog, mysterious sleep, characters randomly falling asleep, or waking up from a dream.`,
       user,
-      { maxTokens: 4500 },
+    };
+  }
+
+  private async generateStrategicSeasonFramework(
+    season: Season,
+    protagonist: Record<string, any>,
+    targetAudience: Record<string, any>,
+    seasonSetup: Record<string, any>,
+    diagnosticContext: SeasonFrameworkDiagnosticContext,
+  ): Promise<{ framework: Record<string, any>; model: string }> {
+    const prompt = this.buildStrategicSeasonFrameworkPrompt(protagonist, targetAudience, seasonSetup);
+    const primaryModel = this.openRouter.getSeasonModel();
+    const onPrimaryFailure = (failure: OpenRouterJsonFailure) => this.recordFrameworkLlmFailure(
+      season, diagnosticContext, failure, prompt, 'primary', primaryModel,
     );
+
+    try {
+      return {
+        framework: await this.generateSeasonJson(prompt.system, prompt.user, {
+          maxTokens: 4500,
+          throwOnEmptyContent: true,
+          suppressRawFailureLog: true,
+          onFailure: onPrimaryFailure,
+        }),
+        model: primaryModel,
+      };
+    } catch (error) {
+      if (!(error instanceof OpenRouterEmptyContentError)) throw error;
+
+      const fallbackModel = process.env.OPENROUTER_SEASON_EMPTY_RESPONSE_FALLBACK_MODEL
+        || SEASON_EMPTY_RESPONSE_FALLBACK_MODEL;
+      this.logger.warn(
+        `[SeasonFramework] empty completion seasonId=${season.seasonId} jobId=${diagnosticContext.jobId || 'manual'} primary=${primaryModel}; using ${fallbackModel}`,
+      );
+      void this.analytics.capture('season_framework_empty_response_fallback_started', season.ownerUserId, {
+        stage: 'framework', primary_model: primaryModel, fallback_model: fallbackModel,
+        primary_provider: error.failure.actualProvider, finish_reason: error.failure.finishReason,
+      });
+
+      try {
+        const framework = await this.generateSeasonJson(prompt.system, prompt.user, {
+          maxTokens: 4500,
+          model: fallbackModel,
+          reasoning: { effort: 'medium' },
+          providerOrder: [],
+          throwOnEmptyContent: true,
+          suppressRawFailureLog: true,
+          onFailure: (failure) => this.recordFrameworkLlmFailure(
+            season, diagnosticContext, failure, prompt, 'empty_response_fallback', fallbackModel,
+          ),
+        });
+        void this.analytics.capture('season_framework_empty_response_fallback_succeeded', season.ownerUserId, {
+          stage: 'framework', primary_model: primaryModel, fallback_model: fallbackModel,
+        });
+        return { framework, model: fallbackModel };
+      } catch (fallbackError) {
+        void this.analytics.capture('season_framework_empty_response_fallback_failed', season.ownerUserId, {
+          stage: 'framework', primary_model: primaryModel, fallback_model: fallbackModel,
+          error_kind: fallbackError instanceof OpenRouterEmptyContentError ? 'empty_content' : 'request_or_parse_error',
+        });
+        throw fallbackError;
+      }
+    }
+  }
+
+  private async recordFrameworkLlmFailure(
+    season: Season,
+    context: SeasonFrameworkDiagnosticContext,
+    failure: OpenRouterJsonFailure,
+    prompt: { system: string; user: string },
+    route: 'primary' | 'empty_response_fallback',
+    requestedModel: string,
+  ) {
+    const diagnosticId = await this.llmDiagnostics.record({
+      seasonId: season.seasonId,
+      jobId: context.jobId || null,
+      stage: 'framework',
+      attempt: context.attempt,
+      failureKind: failure.kind,
+      model: failure.model || requestedModel,
+      requestedProvider: failure.requestedProvider || null,
+      actualProvider: failure.actualProvider,
+      durationMs: failure.durationMs,
+      httpStatus: failure.httpStatus,
+      responseId: failure.responseId,
+      finishReason: failure.finishReason,
+      usage: failure.usage,
+      validationIssues: null,
+      payload: {
+        route,
+        requestedModel,
+        systemPrompt: failure.requestSystemPrompt || prompt.system,
+        userPrompt: failure.requestUserPrompt || prompt.user,
+        rawResponse: failure.rawResponse,
+        content: failure.content,
+        reasoning: failure.reasoning,
+        errorBody: failure.errorBody,
+      },
+    });
+    this.logger.error(
+      `[SeasonFramework] llm_failure diagnosticId=${diagnosticId || 'unavailable'} seasonId=${season.seasonId} jobId=${context.jobId || 'manual'} route=${route} kind=${failure.kind} model=${failure.model} provider=${failure.actualProvider || 'unknown'} status=${failure.httpStatus || 'N/A'} finishReason=${failure.finishReason || 'N/A'} durationMs=${failure.durationMs}`,
+    );
+    void this.analytics.capture('season_framework_llm_failed', season.ownerUserId, {
+      stage: 'framework', route, failure_kind: failure.kind, model: failure.model,
+      actual_provider: failure.actualProvider, http_status: failure.httpStatus,
+      finish_reason: failure.finishReason,
+    });
+  }
+
+  private async recordFrameworkValidationFailure(
+    season: Season,
+    context: SeasonFrameworkDiagnosticContext,
+    model: string,
+    framework: Record<string, any>,
+    validationIssues: string[],
+  ) {
+    const diagnosticId = await this.llmDiagnostics.record({
+      seasonId: season.seasonId,
+      jobId: context.jobId || null,
+      stage: 'framework',
+      attempt: context.attempt,
+      failureKind: 'framework_validation_failed',
+      model,
+      requestedProvider: null,
+      actualProvider: null,
+      durationMs: null,
+      httpStatus: null,
+      responseId: null,
+      finishReason: null,
+      usage: null,
+      validationIssues,
+      payload: { framework },
+    });
+    this.logger.error(
+      `[SeasonFramework] validation_failed diagnosticId=${diagnosticId || 'unavailable'} seasonId=${season.seasonId} jobId=${context.jobId || 'manual'} model=${model} issues=${validationIssues.join('; ')}`,
+    );
+    void this.analytics.capture('season_framework_validation_failed', season.ownerUserId, {
+      stage: 'framework', model, validation_issue_count: validationIssues.length,
+    });
   }
 
   private async generateSeasonBible(
@@ -7096,7 +7274,7 @@ The image must be suitable as a visual consistency reference for future story il
     let lastError: unknown = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        await this.runSeasonBootstrap(job.seasonId, setStage);
+        await this.runSeasonBootstrap(job.seasonId, setStage, { jobId: job.jobId, attempt });
         job.status = 'ready';
         job.result = { stage: 'complete' };
         job.error = null;
@@ -10285,6 +10463,12 @@ Requirements:
   }
 
   private isRetryableOpenRouterError(error: any) {
+    // The framework path already switches to Qwen after an empty DeepSeek completion.
+    // A second empty response must surface as a recoverable failed job, not restart the
+    // whole framework and spend another primary-model attempt.
+    if (error instanceof OpenRouterEmptyContentError) {
+      return false;
+    }
     const code = String(error?.code || error?.cause?.code || '').toUpperCase();
     const status = Number(error?.response?.status || 0);
     const message = String(error?.message || '').toLowerCase();

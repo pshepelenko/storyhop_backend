@@ -58,7 +58,39 @@ export interface JsonGenerationOptions {
   reasoning?: { enabled?: boolean; effort?: string };
   providerOrder?: string[];
   providerAllowFallbacks?: boolean;
+  providerSort?: string;
   timeoutMs?: number;
+  /** Used by the season framework pipeline to distinguish an empty upstream completion from malformed JSON. */
+  throwOnEmptyContent?: boolean;
+  suppressRawFailureLog?: boolean;
+  onFailure?: (failure: OpenRouterJsonFailure) => Promise<void> | void;
+}
+
+export type OpenRouterJsonFailureKind = 'empty_content' | 'invalid_json' | 'request_error' | 'json_repair_error';
+
+export interface OpenRouterJsonFailure {
+  kind: OpenRouterJsonFailureKind;
+  model: string;
+  requestedProvider: Record<string, unknown> | undefined;
+  actualProvider: string | null;
+  responseId: string | null;
+  finishReason: string | null;
+  usage: Record<string, unknown> | null;
+  rawResponse: Record<string, any> | null;
+  content: string;
+  reasoning: string;
+  httpStatus: number | null;
+  errorBody: unknown;
+  durationMs: number;
+  requestSystemPrompt?: string;
+  requestUserPrompt?: string;
+}
+
+export class OpenRouterEmptyContentError extends Error {
+  constructor(public readonly failure: OpenRouterJsonFailure) {
+    super(`OpenRouter returned empty response for model ${failure.model}`);
+    this.name = 'OpenRouterEmptyContentError';
+  }
 }
 
 @Injectable()
@@ -174,21 +206,29 @@ export class OpenRouterService {
     provider: Record<string, unknown> | undefined,
     timeoutMs: number,
   ) {
-    return axios.post(
-      'https://openrouter.ai/api/v1/chat/completions',
-      {
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature,
-        max_tokens: maxTokens,
-        reasoning,
-        ...(provider ? { provider } : {}),
-      },
-      { headers: this.authHeaders(), timeout: timeoutMs },
-    );
+    const startedAt = Date.now();
+    try {
+      const response = await axios.post(
+        'https://openrouter.ai/api/v1/chat/completions',
+        {
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          temperature,
+          max_tokens: maxTokens,
+          reasoning,
+          ...(provider ? { provider } : {}),
+        },
+        { headers: this.authHeaders(), timeout: timeoutMs },
+      );
+      (response as any).__storyHopDurationMs = Date.now() - startedAt;
+      return response;
+    } catch (error) {
+      (error as any).__storyHopDurationMs = Date.now() - startedAt;
+      throw error;
+    }
   }
 
   private buildReasoning(effort: string): { enabled: false } | { effort: string } {
@@ -236,6 +276,10 @@ export class OpenRouterService {
 
   getTtsVoice(): string {
     return this.config.ttsVoice;
+  }
+
+  getSeasonReasoningEffort(): string {
+    return this.config.seasonReasoningEffort;
   }
 
   getSttModel(): string {
@@ -302,9 +346,18 @@ export class OpenRouterService {
       || (isSeason
         ? this.buildReasoning(this.config.seasonReasoningEffort)
         : { enabled: false });
-    const provider = isSeason
+    const defaultProvider = isSeason
       ? this.buildSeasonProviderRouting()
       : this.buildStoryProviderRouting();
+    const provider = options?.providerOrder !== undefined
+      ? this.buildProviderRouting(
+        options.providerOrder,
+        options.providerAllowFallbacks ?? (isSeason
+          ? this.config.seasonProviderAllowFallbacks
+          : this.config.storyProviderAllowFallbacks),
+        options.providerSort ?? (isSeason ? this.config.seasonProviderSort : this.config.storyProviderSort),
+      )
+      : defaultProvider;
     const defaultMaxTokens = isSeason ? 8000 : 2500;
     const defaultTimeoutMs = isSeason ? 300000 : 120000;
 
@@ -320,20 +373,19 @@ export class OpenRouterService {
         options?.timeoutMs ?? defaultTimeoutMs,
       );
 
-      const content = response.data?.choices?.[0]?.message?.content;
-      const raw = typeof content === 'string'
-        ? content
-        : Array.isArray(content)
-          ? content.map((part: any) => part?.text || part?.content || '').join('')
-          : '';
-
-      return this.parseJsonResponseWithRepair(raw, {
+      return this.parseCompletionWithRepair(response, {
         profile,
         model,
         provider,
         timeoutMs: options?.timeoutMs ?? defaultTimeoutMs,
+        throwOnEmptyContent: options?.throwOnEmptyContent,
+        suppressRawFailureLog: options?.suppressRawFailureLog,
+        onFailure: options?.onFailure,
       });
     } catch (error) {
+      if (error instanceof OpenRouterEmptyContentError) {
+        throw error;
+      }
       if (isSeason && provider && this.shouldRetryWithoutProvider(error)) {
         this.logger.warn(
           `[OpenRouter] generateJson [${model}] returned "No endpoints found" with provider routing; retrying without provider routing`,
@@ -350,18 +402,14 @@ export class OpenRouterService {
             undefined,
             options?.timeoutMs ?? defaultTimeoutMs,
           );
-          const retryContent = retryResponse.data?.choices?.[0]?.message?.content;
-          const retryRaw = typeof retryContent === 'string'
-            ? retryContent
-            : Array.isArray(retryContent)
-              ? retryContent.map((part: any) => part?.text || part?.content || '').join('')
-              : '';
-
-          return this.parseJsonResponseWithRepair(retryRaw, {
+          return this.parseCompletionWithRepair(retryResponse, {
             profile,
             model,
             provider: undefined,
             timeoutMs: options?.timeoutMs ?? defaultTimeoutMs,
+            throwOnEmptyContent: options?.throwOnEmptyContent,
+            suppressRawFailureLog: options?.suppressRawFailureLog,
+            onFailure: options?.onFailure,
           });
         } catch (retryError) {
           if (
@@ -384,34 +432,49 @@ export class OpenRouterService {
                 this.buildProviderRouting([], this.config.seasonProviderAllowFallbacks, this.config.seasonProviderSort),
                 options?.timeoutMs ?? defaultTimeoutMs,
               );
-              const fallbackContent = fallbackResponse.data?.choices?.[0]?.message?.content;
-              const fallbackRaw = typeof fallbackContent === 'string'
-                ? fallbackContent
-                : Array.isArray(fallbackContent)
-                  ? fallbackContent.map((part: any) => part?.text || part?.content || '').join('')
-                  : '';
-
-              return this.parseJsonResponseWithRepair(fallbackRaw, {
+              return this.parseCompletionWithRepair(fallbackResponse, {
                 profile,
                 model: this.config.seasonFallbackModel,
                 provider: this.buildProviderRouting([], this.config.seasonProviderAllowFallbacks, this.config.seasonProviderSort),
                 timeoutMs: options?.timeoutMs ?? defaultTimeoutMs,
+                throwOnEmptyContent: options?.throwOnEmptyContent,
+                suppressRawFailureLog: options?.suppressRawFailureLog,
+                onFailure: options?.onFailure,
               });
             } catch (fallbackError) {
-              this.logger.logOpenRouterError(
+              if (!(fallbackError instanceof OpenRouterEmptyContentError)) {
+                await this.notifyFailure(
+                  options?.onFailure,
+                  this.buildRequestFailure(
+                    this.config.seasonFallbackModel,
+                    this.buildProviderRouting([], this.config.seasonProviderAllowFallbacks, this.config.seasonProviderSort),
+                    fallbackError,
+                  ),
+                );
+              }
+              this.logJsonGenerationError(
                 `generateJson [${this.config.seasonFallbackModel}] fallback-model`,
                 fallbackError,
+                options?.suppressRawFailureLog,
               );
               throw fallbackError;
             }
           }
 
-          this.logger.logOpenRouterError(`generateJson [${model}] retry-without-provider`, retryError);
+          if (!(retryError instanceof OpenRouterEmptyContentError)) {
+            await this.notifyFailure(options?.onFailure, this.buildRequestFailure(model, undefined, retryError));
+          }
+          this.logJsonGenerationError(
+            `generateJson [${model}] retry-without-provider`,
+            retryError,
+            options?.suppressRawFailureLog,
+          );
           throw retryError;
         }
       }
 
-      this.logger.logOpenRouterError(`generateJson [${model}]`, error);
+      await this.notifyFailure(options?.onFailure, this.buildRequestFailure(model, provider, error));
+      this.logJsonGenerationError(`generateJson [${model}]`, error, options?.suppressRawFailureLog);
       throw error;
     }
   }
@@ -718,6 +781,98 @@ export class OpenRouterService {
     return null;
   }
 
+  private extractCompletion(response: any, model: string, provider: Record<string, unknown> | undefined, durationMs: number): OpenRouterJsonFailure {
+    const message = response?.data?.choices?.[0]?.message || {};
+    const content = message?.content;
+    const raw = typeof content === 'string'
+      ? content
+      : Array.isArray(content)
+        ? content.map((part: any) => part?.text || part?.content || '').join('')
+        : '';
+    const reasoning = typeof message?.reasoning === 'string'
+      ? message.reasoning
+      : typeof message?.reasoning_content === 'string'
+        ? message.reasoning_content
+        : '';
+    const actualProvider = response?.data?.provider || response?.headers?.['x-openrouter-provider'] || null;
+    return {
+      kind: raw.trim() ? 'invalid_json' : 'empty_content',
+      model,
+      requestedProvider: provider,
+      actualProvider: actualProvider ? String(actualProvider) : null,
+      responseId: response?.data?.id ? String(response.data.id) : null,
+      finishReason: response?.data?.choices?.[0]?.finish_reason ? String(response.data.choices[0].finish_reason) : null,
+      usage: response?.data?.usage && typeof response.data.usage === 'object' ? response.data.usage : null,
+      rawResponse: response?.data && typeof response.data === 'object' ? response.data : null,
+      content: raw,
+      reasoning,
+      httpStatus: Number(response?.status || 0) || null,
+      errorBody: null,
+      durationMs: Number(response?.__storyHopDurationMs || durationMs) || 0,
+    };
+  }
+
+  private buildRequestFailure(model: string, provider: Record<string, unknown> | undefined, error: any): OpenRouterJsonFailure {
+    return {
+      kind: 'request_error',
+      model,
+      requestedProvider: provider,
+      actualProvider: null,
+      responseId: error?.response?.data?.id ? String(error.response.data.id) : null,
+      finishReason: null,
+      usage: error?.response?.data?.usage && typeof error.response.data.usage === 'object' ? error.response.data.usage : null,
+      rawResponse: null,
+      content: '',
+      reasoning: '',
+      httpStatus: Number(error?.response?.status || 0) || null,
+      errorBody: error?.response?.data || error?.message || null,
+      durationMs: Number(error?.__storyHopDurationMs || 0) || 0,
+    };
+  }
+
+  private async notifyFailure(
+    callback: JsonGenerationOptions['onFailure'],
+    failure: OpenRouterJsonFailure,
+  ) {
+    if (!callback) return;
+    try {
+      await callback(failure);
+    } catch (callbackError) {
+      this.logger.warn(`[OpenRouter] diagnostic callback failed: ${callbackError instanceof Error ? callbackError.message : String(callbackError)}`);
+    }
+  }
+
+  private logJsonGenerationError(context: string, error: any, suppressBody?: boolean) {
+    if (!suppressBody) {
+      this.logger.logOpenRouterError(context, error);
+      return;
+    }
+    const status = error?.response?.status || 'N/A';
+    const code = error?.code || error?.cause?.code || status;
+    const message = String(error?.message || 'no message').slice(0, 500);
+    this.logger.error(`[OpenRouter] ${context} failed | status=${status} code=${code} | ${message} | body=stored_in_encrypted_diagnostics`);
+  }
+
+  private async parseCompletionWithRepair(
+    response: any,
+    context: {
+      profile: 'story' | 'season';
+      model: string;
+      provider: Record<string, unknown> | undefined;
+      timeoutMs: number;
+      throwOnEmptyContent?: boolean;
+      suppressRawFailureLog?: boolean;
+      onFailure?: JsonGenerationOptions['onFailure'];
+    },
+  ): Promise<Record<string, any>> {
+    const failure = this.extractCompletion(response, context.model, context.provider, 0);
+    if (!failure.content.trim() && context.throwOnEmptyContent) {
+      await this.notifyFailure(context.onFailure, failure);
+      throw new OpenRouterEmptyContentError(failure);
+    }
+    return this.parseJsonResponseWithRepair(failure.content, { ...context, completion: failure });
+  }
+
   private async parseJsonResponseWithRepair(
     raw: string,
     context: {
@@ -725,16 +880,39 @@ export class OpenRouterService {
       model: string;
       provider: Record<string, unknown> | undefined;
       timeoutMs: number;
+      suppressRawFailureLog?: boolean;
+      onFailure?: JsonGenerationOptions['onFailure'];
+      completion?: OpenRouterJsonFailure;
     },
   ): Promise<Record<string, any>> {
     try {
       return this.parseJsonResponse(raw);
     } catch (parseError) {
-      this.logger.logInvalidLlmResponse(
-        `generateJson [${context.model}]`,
-        raw,
-        parseError,
-      );
+      await this.notifyFailure(context.onFailure, {
+        ...(context.completion || {}),
+        kind: 'invalid_json', model: context.model, requestedProvider: context.provider,
+        content: raw,
+        errorBody: parseError instanceof Error ? parseError.message : String(parseError),
+        actualProvider: context.completion?.actualProvider || null,
+        responseId: context.completion?.responseId || null,
+        finishReason: context.completion?.finishReason || null,
+        usage: context.completion?.usage || null,
+        rawResponse: context.completion?.rawResponse || null,
+        reasoning: context.completion?.reasoning || '',
+        httpStatus: context.completion?.httpStatus || null,
+        durationMs: context.completion?.durationMs || 0,
+      });
+      if (context.suppressRawFailureLog) {
+        this.logger.error(
+          `[OpenRouter] generateJson [${context.model}] returned invalid JSON | parseError=${parseError instanceof Error ? parseError.message : String(parseError)} | raw=stored_in_encrypted_diagnostics`,
+        );
+      } else {
+        this.logger.logInvalidLlmResponse(
+          `generateJson [${context.model}]`,
+          raw,
+          parseError,
+        );
+      }
       const repairModel = context.profile === 'season'
         ? this.config.seasonFallbackModel
         : this.config.chatModel;
@@ -747,7 +925,9 @@ export class OpenRouterService {
       );
 
       let repairRaw = '';
+      let repairCompletion: OpenRouterJsonFailure | null = null;
       try {
+        const repairStartedAt = Date.now();
         const repairResponse = await this.requestJsonCompletion(
           repairModel,
           system,
@@ -760,20 +940,48 @@ export class OpenRouterService {
             : context.provider,
           context.timeoutMs,
         );
-        const repairContent = repairResponse.data?.choices?.[0]?.message?.content;
-        repairRaw = typeof repairContent === 'string'
-          ? repairContent
-          : Array.isArray(repairContent)
-            ? repairContent.map((part: any) => part?.text || part?.content || '').join('')
-            : '';
+        (repairResponse as any).__storyHopDurationMs = Date.now() - repairStartedAt;
+        repairCompletion = this.extractCompletion(
+          repairResponse,
+          repairModel,
+          context.profile === 'season'
+            ? this.buildProviderRouting([], this.config.seasonProviderAllowFallbacks, this.config.seasonProviderSort)
+            : context.provider,
+          0,
+        );
+        repairRaw = repairCompletion.content;
         return this.parseJsonResponse(repairRaw);
       } catch (repairError) {
+        await this.notifyFailure(context.onFailure, {
+          ...(repairCompletion || {}),
+          kind: 'json_repair_error', model: repairModel,
+          requestedProvider: context.profile === 'season'
+            ? this.buildProviderRouting([], this.config.seasonProviderAllowFallbacks, this.config.seasonProviderSort)
+            : context.provider,
+          actualProvider: repairCompletion?.actualProvider || null,
+          responseId: repairCompletion?.responseId || null,
+          finishReason: repairCompletion?.finishReason || null,
+          usage: repairCompletion?.usage || null,
+          rawResponse: repairCompletion?.rawResponse || null,
+          content: repairRaw, reasoning: repairCompletion?.reasoning || '',
+          httpStatus: repairCompletion?.httpStatus || Number((repairError as any)?.response?.status || 0) || null,
+          errorBody: repairError instanceof Error ? repairError.message : String(repairError),
+          durationMs: repairCompletion?.durationMs || Number((repairError as any)?.__storyHopDurationMs || 0) || 0,
+          requestSystemPrompt: system,
+          requestUserPrompt: user,
+        });
         if (repairRaw) {
-          this.logger.logInvalidLlmResponse(
-            `generateJson [${repairModel}] json-repair`,
-            repairRaw,
-            repairError,
-          );
+          if (context.suppressRawFailureLog) {
+            this.logger.error(
+              `[OpenRouter] generateJson [${repairModel}] json-repair returned invalid JSON | raw=stored_in_encrypted_diagnostics`,
+            );
+          } else {
+            this.logger.logInvalidLlmResponse(
+              `generateJson [${repairModel}] json-repair`,
+              repairRaw,
+              repairError,
+            );
+          }
         }
         this.logger.logOpenRouterError(`generateJson [${repairModel}] json-repair`, repairError);
         throw parseError;

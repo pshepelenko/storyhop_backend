@@ -3,9 +3,10 @@ import { SeasonsModule } from '../seasons/seasons.module';
 import { SeasonsService } from '../seasons/seasons.service';
 import { WorkerService } from './worker.service';
 import { WorkerController } from './worker.controller';
+import { LlmDiagnosticsModule } from '../llm-diagnostics/llm-diagnostics.module';
 
 @Module({
-  imports: [SeasonsModule],
+  imports: [SeasonsModule, LlmDiagnosticsModule],
   providers: [WorkerService],
   controllers: [WorkerController],
 })

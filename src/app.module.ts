@@ -38,6 +38,9 @@ import { runMigrations } from './migrations/migration-runner';
 import { UsersModule } from './users/users.module';
 import { AudioMetadataModule } from './audio-metadata/audio-metadata.module';
 import { ReadingAlignmentModule } from './reading-alignment/reading-alignment.module';
+import { LlmGenerationDiagnostic } from './llm-diagnostics/entities/llm-generation-diagnostic.entity';
+import { LlmDiagnosticsModule } from './llm-diagnostics/llm-diagnostics.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 const env = (...keys: string[]) => keys.map((key) => process.env[key]).find(Boolean);
 const envFlag = (...keys: string[]) => env(...keys) === 'true';
@@ -61,7 +64,7 @@ const envFlag = (...keys: string[]) => env(...keys) === 'true';
         Season, SeasonFramework, Hero, Episode, EpisodeChoice,
         GenerationJob, CrystalWallet, CrystalLedgerEntry,
         Illustration, StorybookEntry, PreparedEpisode, Referral, SeasonCharacter, LearningEvent, BonusPracticeState, SeasonDraft,
-        DemoStory, DemoStoryNode,
+        DemoStory, DemoStoryNode, LlmGenerationDiagnostic,
       ],
       synchronize: envFlag('DB_SYNCHRONIZE', 'DATABASE_SYNCHRONIZE'),
       logging: false,
@@ -74,6 +77,8 @@ const envFlag = (...keys: string[]) => env(...keys) === 'true';
     UsersModule,
     AudioMetadataModule,
     ReadingAlignmentModule,
+    LlmDiagnosticsModule,
+    AnalyticsModule,
     SeasonsModule,
     WorkerModule,
     ReferralModule,

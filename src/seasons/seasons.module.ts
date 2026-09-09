@@ -23,9 +23,13 @@ import { ChildProfile } from '../users/entities/child-profile.entity';
 import { SeasonDraft } from './entities/season-draft.entity';
 import { SpeakingTranscriptionService } from './speaking-transcription.service';
 import { SpeakingAudioNormalizerService } from './speaking-audio-normalizer.service';
+import { LlmDiagnosticsModule } from '../llm-diagnostics/llm-diagnostics.module';
+import { AnalyticsModule } from '../analytics/analytics.module';
 
 @Module({
   imports: [
+    LlmDiagnosticsModule,
+    AnalyticsModule,
     TypeOrmModule.forFeature([
       Season,
       SeasonFramework,
