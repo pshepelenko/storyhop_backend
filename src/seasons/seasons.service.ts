@@ -5393,7 +5393,9 @@ export class SeasonsService {
     };
   }
 
-  async backfillAllSeasonVisuals(options: { forceFailedCovers?: boolean } = {}) {
+  async backfillAllSeasonVisuals(
+    options: { forceFailedCovers?: boolean; forceFailedHeroReferences?: boolean } = {},
+  ) {
     const seasons = await this.seasonsRepository.find({ order: { updatedAt: 'DESC' } });
     const results: Record<string, any>[] = [];
 
@@ -5407,8 +5409,13 @@ export class SeasonsService {
         season.seasonSetup?.seasonCoverGenerationStatus === 'processing' &&
         !season.seasonSetup?.seasonCoverImageUrl;
 
-      const failedHeroReference = season.seasonSetup?.heroReferenceImageGenerationStatus === 'failed';
-      if (!missingHero && !missingCover && !failedCover && !stuckCover || (failedHeroReference && !options.forceFailedCovers)) {
+      const heroReferenceFailed = season.seasonSetup?.heroReferenceImageGenerationStatus === 'failed';
+      const retryFailedHeroReference =
+        options.forceFailedHeroReferences && heroReferenceFailed;
+      if (
+        (heroReferenceFailed && !retryFailedHeroReference) ||
+        (!missingHero && !missingCover && !failedCover && !stuckCover && !retryFailedHeroReference)
+      ) {
         results.push({
           seasonId: season.seasonId,
           theme: season.seasonSetup?.theme || null,
@@ -5421,7 +5428,7 @@ export class SeasonsService {
         results.push(
           await this.backfillSeasonVisuals(season.seasonId, {
             forceCover: failedCover || missingCover,
-            forceHeroReference: options.forceFailedCovers && failedHeroReference,
+            forceHeroReference: retryFailedHeroReference,
           }),
         );
       } catch (error) {
@@ -6702,7 +6709,9 @@ The image must be suitable as a visual consistency reference for future story il
 
       throw new Error(`Episode generation returned no unique speaking phrase for season ${season.seasonId}`);
     } catch (error) {
-      this.logGenerationFallback('Episode text', error);
+      this.logger.error(
+        `[EpisodeContent] generation failed seasonId=${season.seasonId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
       throw error;
     }
   }
@@ -10106,12 +10115,6 @@ Requirements:
     }
 
     return false;
-  }
-
-  private logGenerationFallback(scope: string, error: any) {
-    const code = error?.code || error?.cause?.code || 'unknown';
-    const message = error?.message || 'generation failed';
-    console.warn(`${scope} generation failed, using fallback. ${code}: ${message}`);
   }
 
   private async persistEpisodeTtsResult(

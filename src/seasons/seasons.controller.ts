@@ -107,7 +107,7 @@ export class SeasonsController {
 
   @Post('visuals/backfill-all')
   async backfillAllSeasonVisuals(
-    @Body() body: { forceFailedCovers?: boolean } = {},
+    @Body() body: { forceFailedCovers?: boolean; forceFailedHeroReferences?: boolean } = {},
   ) {
     assertMaintenanceRouteEnabled();
     try {
@@ -333,7 +333,7 @@ export class SeasonsController {
   @Post(':seasonId/visuals/backfill')
   async backfillSeasonVisuals(
     @Param('seasonId') seasonId: string,
-    @Body() body: { forceCover?: boolean } = {},
+    @Body() body: { forceCover?: boolean; forceHeroReference?: boolean } = {},
   ) {
     assertMaintenanceRouteEnabled();
     try {
