@@ -603,7 +603,6 @@ export class StoryService {
           },
         ],
         temperature: 0.8,
-        max_tokens: 1800,
         reasoning: {
           enabled: false,
         },

@@ -160,4 +160,57 @@ describe('OpenRouterService season framework completions', () => {
     }));
     expect(prompts.buildPrompt).not.toHaveBeenCalled();
   });
+
+  it('does not send an output-token cap for season text generation', async () => {
+    mockedAxios.post.mockResolvedValue({
+      status: 200,
+      data: {
+        id: 'gen-without-cap',
+        choices: [{ finish_reason: 'stop', message: { content: '{"title":"A season"}' } }],
+      },
+    } as any);
+    const service = new OpenRouterService(logger, prompts);
+
+    await expect(service.generateSeasonJson('system', 'user')).resolves.toEqual({ title: 'A season' });
+
+    expect(mockedAxios.post).toHaveBeenCalledWith(
+      'https://openrouter.ai/api/v1/chat/completions',
+      expect.not.objectContaining({ max_tokens: expect.anything() }),
+      expect.any(Object),
+    );
+  });
+
+  it('forwards an explicitly requested JSON Schema response format', async () => {
+    mockedAxios.post.mockResolvedValue({
+      status: 200,
+      data: {
+        id: 'gen-schema',
+        choices: [{ finish_reason: 'stop', message: { content: '{"episodes":[]}' } }],
+      },
+    } as any);
+    const service = new OpenRouterService(logger, prompts);
+    const schema = {
+      name: 'episode_outline',
+      strict: true,
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['episodes'],
+        properties: { episodes: { type: 'array' } },
+      },
+    };
+
+    await expect(service.generateSeasonJson('system', 'user', { jsonSchema: schema })).resolves.toEqual({ episodes: [] });
+
+    expect(mockedAxios.post).toHaveBeenCalledWith(
+      'https://openrouter.ai/api/v1/chat/completions',
+      expect.objectContaining({
+        response_format: {
+          type: 'json_schema',
+          json_schema: schema,
+        },
+      }),
+      expect.any(Object),
+    );
+  });
 });

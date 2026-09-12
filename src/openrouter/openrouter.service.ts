@@ -60,10 +60,18 @@ export interface JsonGenerationOptions {
   providerAllowFallbacks?: boolean;
   providerSort?: string;
   timeoutMs?: number;
+  jsonSchema?: OpenRouterJsonSchema;
   /** Used by the season framework pipeline to distinguish an empty upstream completion from malformed JSON. */
   throwOnEmptyContent?: boolean;
   suppressRawFailureLog?: boolean;
   onFailure?: (failure: OpenRouterJsonFailure) => Promise<void> | void;
+  onCompletion?: (completion: OpenRouterJsonFailure) => Promise<void> | void;
+}
+
+export interface OpenRouterJsonSchema {
+  name: string;
+  strict?: boolean;
+  schema: Record<string, unknown>;
 }
 
 export type OpenRouterJsonFailureKind = 'empty_content' | 'invalid_json' | 'request_error' | 'json_repair_error';
@@ -201,9 +209,10 @@ export class OpenRouterService {
     systemPrompt: string,
     userPrompt: string,
     temperature: number,
-    maxTokens: number,
+    maxTokens: number | undefined,
     reasoning: { enabled: false } | { effort: string },
     provider: Record<string, unknown> | undefined,
+    jsonSchema: OpenRouterJsonSchema | undefined,
     timeoutMs: number,
   ) {
     const startedAt = Date.now();
@@ -217,9 +226,19 @@ export class OpenRouterService {
             { role: 'user', content: userPrompt },
           ],
           temperature,
-          max_tokens: maxTokens,
+          ...(maxTokens !== undefined ? { max_tokens: maxTokens } : {}),
           reasoning,
           ...(provider ? { provider } : {}),
+          ...(jsonSchema ? {
+            response_format: {
+              type: 'json_schema',
+              json_schema: {
+                name: jsonSchema.name,
+                strict: jsonSchema.strict ?? true,
+                schema: jsonSchema.schema,
+              },
+            },
+          } : {}),
         },
         { headers: this.authHeaders(), timeout: timeoutMs },
       );
@@ -328,7 +347,6 @@ export class OpenRouterService {
     options?: JsonGenerationOptions,
   ): Promise<Record<string, any>> {
     return this.generateJsonWithProfile('season', systemPrompt, userPrompt, {
-      maxTokens: 8000,
       timeoutMs: 300000,
       ...options,
     });
@@ -358,7 +376,6 @@ export class OpenRouterService {
         options.providerSort ?? (isSeason ? this.config.seasonProviderSort : this.config.storyProviderSort),
       )
       : defaultProvider;
-    const defaultMaxTokens = isSeason ? 8000 : 2500;
     const defaultTimeoutMs = isSeason ? 300000 : 120000;
 
     try {
@@ -367,9 +384,10 @@ export class OpenRouterService {
         systemPrompt,
         userPrompt,
         options?.temperature ?? 0.7,
-        options?.maxTokens ?? defaultMaxTokens,
+        options?.maxTokens,
         reasoning,
         provider,
+        options?.jsonSchema,
         options?.timeoutMs ?? defaultTimeoutMs,
       );
 
@@ -381,6 +399,9 @@ export class OpenRouterService {
         throwOnEmptyContent: options?.throwOnEmptyContent,
         suppressRawFailureLog: options?.suppressRawFailureLog,
         onFailure: options?.onFailure,
+        onCompletion: options?.onCompletion,
+        systemPrompt,
+        userPrompt,
       });
     } catch (error) {
       if (error instanceof OpenRouterEmptyContentError) {
@@ -397,9 +418,10 @@ export class OpenRouterService {
             systemPrompt,
             userPrompt,
             options?.temperature ?? 0.7,
-            options?.maxTokens ?? defaultMaxTokens,
+            options?.maxTokens,
             reasoning,
             undefined,
+            options?.jsonSchema,
             options?.timeoutMs ?? defaultTimeoutMs,
           );
           return this.parseCompletionWithRepair(retryResponse, {
@@ -410,6 +432,9 @@ export class OpenRouterService {
             throwOnEmptyContent: options?.throwOnEmptyContent,
             suppressRawFailureLog: options?.suppressRawFailureLog,
             onFailure: options?.onFailure,
+            onCompletion: options?.onCompletion,
+            systemPrompt,
+            userPrompt,
           });
         } catch (retryError) {
           if (
@@ -427,9 +452,10 @@ export class OpenRouterService {
                 systemPrompt,
                 userPrompt,
                 options?.temperature ?? 0.7,
-                options?.maxTokens ?? defaultMaxTokens,
+                options?.maxTokens,
                 reasoning,
                 this.buildProviderRouting([], this.config.seasonProviderAllowFallbacks, this.config.seasonProviderSort),
+                options?.jsonSchema,
                 options?.timeoutMs ?? defaultTimeoutMs,
               );
               return this.parseCompletionWithRepair(fallbackResponse, {
@@ -440,6 +466,9 @@ export class OpenRouterService {
                 throwOnEmptyContent: options?.throwOnEmptyContent,
                 suppressRawFailureLog: options?.suppressRawFailureLog,
                 onFailure: options?.onFailure,
+                onCompletion: options?.onCompletion,
+                systemPrompt,
+                userPrompt,
               });
             } catch (fallbackError) {
               if (!(fallbackError instanceof OpenRouterEmptyContentError)) {
@@ -842,6 +871,18 @@ export class OpenRouterService {
     }
   }
 
+  private async notifyCompletion(
+    callback: JsonGenerationOptions['onCompletion'],
+    completion: OpenRouterJsonFailure,
+  ) {
+    if (!callback) return;
+    try {
+      await callback(completion);
+    } catch (callbackError) {
+      this.logger.warn(`[OpenRouter] completion callback failed: ${callbackError instanceof Error ? callbackError.message : String(callbackError)}`);
+    }
+  }
+
   private logJsonGenerationError(context: string, error: any, suppressBody?: boolean) {
     if (!suppressBody) {
       this.logger.logOpenRouterError(context, error);
@@ -863,9 +904,15 @@ export class OpenRouterService {
       throwOnEmptyContent?: boolean;
       suppressRawFailureLog?: boolean;
       onFailure?: JsonGenerationOptions['onFailure'];
+      onCompletion?: JsonGenerationOptions['onCompletion'];
+      systemPrompt: string;
+      userPrompt: string;
     },
   ): Promise<Record<string, any>> {
     const failure = this.extractCompletion(response, context.model, context.provider, 0);
+    failure.requestSystemPrompt = context.systemPrompt;
+    failure.requestUserPrompt = context.userPrompt;
+    await this.notifyCompletion(context.onCompletion, failure);
     if (!failure.content.trim() && context.throwOnEmptyContent) {
       await this.notifyFailure(context.onFailure, failure);
       throw new OpenRouterEmptyContentError(failure);
@@ -933,11 +980,12 @@ export class OpenRouterService {
           system,
           user,
           0,
-          4000,
+          undefined,
           { enabled: false },
           context.profile === 'season'
             ? this.buildProviderRouting([], this.config.seasonProviderAllowFallbacks, this.config.seasonProviderSort)
             : context.provider,
+          undefined,
           context.timeoutMs,
         );
         (repairResponse as any).__storyHopDurationMs = Date.now() - repairStartedAt;

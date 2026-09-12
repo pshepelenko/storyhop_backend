@@ -243,6 +243,33 @@ Return JSON:
 }`,
     });
 
+    this.register('episode-outline-batch', {
+      version: 'outline-batch-v1',
+      systemPrompt: () => `You are StoryHop's season outline writer.
+Create a causally connected range of episode outline items for an interactive children's season.
+
+Rules:
+- Return valid JSON only.
+- Do not include markdown.
+- Generate only the requested episode number range. Do not repeat existing items.
+- Return exactly {{expectedEpisodeCount}} items: every episode number from {{fromEpisode}} through {{toEpisode}}, once each.
+- Every item must connect to the strategic season framework and one mini-arc.
+- Choices must have story consequences.`,
+      userPrompt: () => `Create episode outline items {{fromEpisode}} through {{toEpisode}} inclusive.
+
+Strategic season framework:
+{{seasonFrameworkJson}}
+
+Season bible:
+{{seasonBibleJson}}
+
+Already generated items (preserve their facts and do not repeat them):
+{{existingEpisodesJson}}
+
+Return exactly this JSON shape:
+{{outlineResponseFormat}}`,
+    });
+
     this.register('hero-profile', {
       version: 'hero-v2',
       systemPrompt: () => `You are StoryHop's child-safe character designer.

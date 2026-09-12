@@ -42,4 +42,21 @@ describe('orderSeasonIdsForWorker', () => {
 
     expect(seasonIds).toEqual(['season-with-both-lanes', 'prefetch-only-season']);
   });
+
+  it('keeps outline-extension work behind a different season with live reading work', () => {
+    const seasonIds = orderSeasonIdsForWorker([
+      {
+        seasonId: 'season-extending-outline',
+        jobType: 'season_outline_extension',
+        createdAt: new Date('2026-09-02T10:00:00.000Z'),
+      },
+      {
+        seasonId: 'season-reader-is-waiting',
+        jobType: 'tts_chunk',
+        createdAt: new Date('2026-09-02T10:01:00.000Z'),
+      },
+    ]);
+
+    expect(seasonIds).toEqual(['season-reader-is-waiting', 'season-extending-outline']);
+  });
 });

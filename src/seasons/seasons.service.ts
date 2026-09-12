@@ -6,6 +6,7 @@ import {
   JsonGenerationOptions,
   OpenRouterEmptyContentError,
   OpenRouterJsonFailure,
+  OpenRouterJsonSchema,
   OpenRouterService,
 } from '../openrouter/openrouter.service';
 import { StorageService } from '../storage/storage.service';
@@ -13,6 +14,7 @@ import { AudioMetadataService } from '../audio-metadata/audio-metadata.service';
 import { ReadingAlignment, ReadingAlignmentService } from '../reading-alignment/reading-alignment.service';
 import { PromptsService } from '../prompts/prompts.service';
 import { validateSeasonFramework } from './framework-validator';
+import { validateEpisodeOutlineRange } from './episode-outline-validator';
 import { Season } from './entities/season.entity';
 import { SeasonFramework } from './entities/season-framework.entity';
 import { Hero } from './entities/hero.entity';
@@ -78,6 +80,9 @@ const PREPARED_PROSE_PROMPT_VERSION = 'prepared-next-v3';
 const TTS_JOB_PROMPT_VERSION = 'tts-job-v2';
 const READING_ALIGNMENT_JOB_PROMPT_VERSION = 'reading-alignment-v1';
 const SEASON_TITLE_PROMPT_VERSION = 'season-title-v1';
+const SEASON_OUTLINE_EXTENSION_PROMPT_VERSION = 'outline-batch-v1';
+const INITIAL_OUTLINE_EPISODE_COUNT = 5;
+const SEASON_OUTLINE_EPISODE_COUNT = 96;
 const EPISODE_MIN_WORDS = 240;
 const EPISODE_MAX_WORDS = 320;
 const ILLUSTRATION_UNLOCK_COST = 3;
@@ -106,6 +111,13 @@ const WRITING_PRACTICE_COOLDOWN_EPISODES = 5;
 const SEASON_EMPTY_RESPONSE_FALLBACK_MODEL = 'qwen/qwen3.8-2.4t-a95b';
 
 type SeasonFrameworkDiagnosticContext = {
+  jobId?: string;
+  attempt: number;
+};
+
+type EpisodeOutlineDiagnosticContext = {
+  seasonId: string;
+  ownerUserId: string;
   jobId?: string;
   attempt: number;
 };
@@ -470,11 +482,19 @@ export class SeasonsService {
     let episodeOutline = seasonFramework.episodeOutline || {};
     if (!Array.isArray(episodeOutline.episodes) || !episodeOutline.episodes.length) {
       await onStage?.('episode_outline');
-      episodeOutline = await this.generateEpisodeOutline(framework, seasonBible);
+      episodeOutline = await this.generateEpisodeOutline(
+        framework,
+        seasonBible,
+        1,
+        INITIAL_OUTLINE_EPISODE_COUNT,
+        [],
+        { seasonId: season.seasonId, ownerUserId: season.ownerUserId, attempt: diagnosticContext.attempt },
+      );
       seasonFramework.episodeOutline = episodeOutline;
       seasonFramework.generationStatus = 'processing';
       seasonFramework.updatedAt = new Date();
       await this.seasonFrameworksRepository.save(seasonFramework);
+      await this.enqueueSeasonOutlineExtensionJob(season.seasonId, episodeOutline);
     }
 
     await onStage?.('finalizing');
@@ -3538,6 +3558,52 @@ export class SeasonsService {
       season.updatedAt = new Date();
 
       if (!outlineItem) {
+        const generatedThrough = Number(
+          seasonFramework.episodeOutline?.generation?.generatedThrough ||
+            seasonFramework.episodeOutline?.episodes?.length ||
+            0,
+        );
+        if (generatedThrough < SEASON_OUTLINE_EPISODE_COUNT) {
+          const now = new Date();
+          let queuedChoice = existingChoiceRecord;
+          if (!queuedChoice) {
+            queuedChoice = await this.episodeChoicesRepository.save(
+              this.episodeChoicesRepository.create({
+                choiceRecordId: uuidv4(),
+                seasonId,
+                episodeId,
+                episodeNumber: episode.episodeNumber,
+                choiceId: selectedChoice.id,
+                choicePayload: selectedChoice,
+                resultingStoryState: updatedStoryState,
+                generationStatus: 'queued',
+                generationJobId: null,
+                targetEpisodeNumber: nextEpisodeNumber,
+                generationError: null,
+                createdAt: now,
+                updatedAt: now,
+              }),
+            );
+            await this.awardChoiceCrystals(season.ownerUserId, seasonId, episode, selectedChoice);
+          }
+          queuedChoice.generationStatus = 'queued';
+          queuedChoice.generationError = null;
+          queuedChoice.targetEpisodeNumber = nextEpisodeNumber;
+          queuedChoice.updatedAt = now;
+          await this.episodeChoicesRepository.save(queuedChoice);
+          await this.enqueueSeasonOutlineExtensionJob(seasonId, seasonFramework.episodeOutline || {});
+          await this.seasonsRepository.save(season);
+          this.logPipelineStep('choice_waiting_for_outline_extension', {
+            seasonId,
+            episodeId,
+            choiceId: selectedChoice.id,
+            nextEpisodeNumber,
+            generatedThrough,
+            choiceRecordId: queuedChoice.choiceRecordId,
+          });
+          return this.getSeason(seasonId);
+        }
+
         if (!existingChoiceRecord) {
           await this.episodeChoicesRepository.save(
             this.episodeChoicesRepository.create({
@@ -3621,33 +3687,7 @@ export class SeasonsService {
           await this.awardChoiceCrystals(season.ownerUserId, seasonId, episode, selectedChoice);
         }
 
-        const activeJob = queuedChoice.generationJobId
-          ? await this.generationJobsRepository.findOne({ where: { jobId: queuedChoice.generationJobId } })
-          : null;
-        if (!activeJob || !['pending', 'processing'].includes(activeJob.status)) {
-          const job = await this.generationJobsRepository.save(
-            this.generationJobsRepository.create({
-              jobId: uuidv4(),
-              seasonId,
-              episodeId,
-              jobType: 'episode_choice_generation',
-              status: 'pending',
-              payload: {
-                sourceEpisodeId: episodeId,
-                choiceId: selectedChoice.id,
-                nextEpisodeNumber,
-                choiceRecordId: queuedChoice.choiceRecordId,
-                attemptCount: Number(activeJob?.payload?.attemptCount || 0),
-              },
-              result: {},
-              error: null,
-              promptVersion: EPISODE_PROMPT_VERSION,
-              createdAt: now,
-              updatedAt: now,
-            }),
-          );
-          queuedChoice.generationJobId = job.jobId;
-        }
+        await this.enqueueEpisodeChoiceGenerationJob(queuedChoice, now);
         queuedChoice.generationStatus = 'queued';
         queuedChoice.targetEpisodeNumber = nextEpisodeNumber;
         queuedChoice.generationError = null;
@@ -4189,6 +4229,7 @@ export class SeasonsService {
     const dryRun = Boolean(options.dryRun);
     const contentJobTypes = new Set([
       'season_bootstrap',
+      'season_outline_extension',
       'episode_choice_generation',
       'prepared_branch_plan',
       'prepared_episode_prose',
@@ -4246,7 +4287,9 @@ export class SeasonsService {
       prepared_episode: 4,
       prepared_tts_chunk: 5,
       prepared_image_generation: 6,
-      season_title: 7,
+      // The rest of a season plan must never delay a newly visible episode.
+      season_outline_extension: 7,
+      season_title: 8,
       // Exact timestamps refine an already-visible deterministic map. They must
       // never outrank prose, TTS, or illustrations.
       audio_reading_alignment: 8,
@@ -4289,6 +4332,9 @@ export class SeasonsService {
     const executeJob = async (job: GenerationJob) => {
       if (job.jobType === 'season_bootstrap') {
         return this.processSeasonBootstrapJob(job);
+      }
+      if (job.jobType === 'season_outline_extension') {
+        return this.processSeasonOutlineExtensionJob(job);
       }
       if (job.jobType === 'episode_choice_generation') {
         return this.processEpisodeChoiceGenerationJob(job, dryRun);
@@ -5170,6 +5216,11 @@ export class SeasonsService {
     }
 
     season.status = 'hero_ready';
+    season.seasonSetup = {
+      ...(season.seasonSetup || {}),
+      heroReferenceImageGenerationStatus: 'pending',
+      heroReferenceImageGenerationError: null,
+    };
     season.updatedAt = now;
     await this.seasonsRepository.save(season);
 
@@ -5207,6 +5258,17 @@ export class SeasonsService {
         if (!hero || hero.heroReferenceImageUrl) {
           return;
         }
+        const season = await this.seasonsRepository.findOne({ where: { seasonId } });
+        if (!season || season.seasonSetup?.heroReferenceImageGenerationStatus === 'failed') {
+          return;
+        }
+        season.seasonSetup = {
+          ...(season.seasonSetup || {}),
+          heroReferenceImageGenerationStatus: 'processing',
+          heroReferenceImageGenerationError: null,
+        };
+        season.updatedAt = new Date();
+        await this.seasonsRepository.save(season);
         const heroReferenceImageUrl = await this.generateHeroReferenceImage(
           seasonId,
           heroProfile,
@@ -5215,8 +5277,25 @@ export class SeasonsService {
         hero.heroReferenceImageUrl = heroReferenceImageUrl || null;
         hero.updatedAt = new Date();
         await this.heroesRepository.save(hero);
+        season.seasonSetup = {
+          ...(season.seasonSetup || {}),
+          heroReferenceImageGenerationStatus: 'ready',
+          heroReferenceImageGenerationError: null,
+        };
+        season.updatedAt = new Date();
+        await this.seasonsRepository.save(season);
         void this.generateSeasonCoverInBackground(seasonId);
       } catch (error) {
+        const season = await this.seasonsRepository.findOne({ where: { seasonId } });
+        if (season) {
+          season.seasonSetup = {
+            ...(season.seasonSetup || {}),
+            heroReferenceImageGenerationStatus: 'failed',
+            heroReferenceImageGenerationError: this.formatGenerationError(error),
+          };
+          season.updatedAt = new Date();
+          await this.seasonsRepository.save(season);
+        }
         this.logger.warn(
           `[HeroReferenceImage] Failed to backfill hero reference image for seasonId=${seasonId}: ${error instanceof Error ? error.message : String(error)}`,
         );
@@ -5244,7 +5323,10 @@ export class SeasonsService {
     this.visualBackfillInFlight.set(seasonId, task);
   }
 
-  async backfillSeasonVisuals(seasonId: string, options: { forceCover?: boolean } = {}) {
+  async backfillSeasonVisuals(
+    seasonId: string,
+    options: { forceCover?: boolean; forceHeroReference?: boolean } = {},
+  ) {
     const season = await this.seasonsRepository.findOne({ where: { seasonId } });
     const hero = await this.heroesRepository.findOne({ where: { seasonId } });
     const framework = await this.seasonFrameworksRepository.findOne({ where: { seasonId } });
@@ -5255,7 +5337,12 @@ export class SeasonsService {
     let heroGenerated = false;
     let coverGenerated = false;
 
-    if (!hero.heroReferenceImageUrl) {
+    const heroReferenceStatus = String(season.seasonSetup?.heroReferenceImageGenerationStatus || '');
+    const shouldGenerateHeroReference =
+      !hero.heroReferenceImageUrl &&
+      (options.forceHeroReference || heroReferenceStatus !== 'failed');
+
+    if (shouldGenerateHeroReference) {
       await this.generateHeroReferenceImageInBackground(
         seasonId,
         hero.heroProfile || {},
@@ -5320,7 +5407,8 @@ export class SeasonsService {
         season.seasonSetup?.seasonCoverGenerationStatus === 'processing' &&
         !season.seasonSetup?.seasonCoverImageUrl;
 
-      if (!missingHero && !missingCover && !failedCover && !stuckCover) {
+      const failedHeroReference = season.seasonSetup?.heroReferenceImageGenerationStatus === 'failed';
+      if (!missingHero && !missingCover && !failedCover && !stuckCover || (failedHeroReference && !options.forceFailedCovers)) {
         results.push({
           seasonId: season.seasonId,
           theme: season.seasonSetup?.theme || null,
@@ -5331,7 +5419,10 @@ export class SeasonsService {
 
       try {
         results.push(
-          await this.backfillSeasonVisuals(season.seasonId, { forceCover: failedCover || missingCover }),
+          await this.backfillSeasonVisuals(season.seasonId, {
+            forceCover: failedCover || missingCover,
+            forceHeroReference: options.forceFailedCovers && failedHeroReference,
+          }),
         );
       } catch (error) {
         results.push({
@@ -5960,7 +6051,6 @@ The image should make ${childName}'s season feel personal, magical, and immediat
     try {
       return {
         framework: await this.generateSeasonJson(prompt.system, prompt.user, {
-          maxTokens: 4500,
           throwOnEmptyContent: true,
           suppressRawFailureLog: true,
           onFailure: onPrimaryFailure,
@@ -5982,7 +6072,6 @@ The image should make ${childName}'s season feel personal, magical, and immediat
 
       try {
         const framework = await this.generateSeasonJson(prompt.system, prompt.user, {
-          maxTokens: 4500,
           model: fallbackModel,
           reasoning: { effort: 'medium' },
           providerOrder: [],
@@ -6094,27 +6183,208 @@ The image should make ${childName}'s season feel personal, magical, and immediat
       heroProfileJsonOrNull: this.stringifyJson(protagonist),
     });
 
-    try {
-      return await this.generateSeasonJson(system, user, { maxTokens: 5000 });
-    } catch (error) {
-      this.logGenerationFallback('Season bible', error);
-      return this.buildFallbackSeasonBible(protagonist, seasonSetup, framework);
-    }
+    return this.generateSeasonJson(system, user);
   }
 
-  private async generateEpisodeOutline(framework: Record<string, any>, seasonBible: Record<string, any>) {
-    const { system, user } = this.prompts.buildPrompt('episode-outline', {
+  private async generateEpisodeOutline(
+    framework: Record<string, any>,
+    seasonBible: Record<string, any>,
+    fromEpisode: number,
+    toEpisode: number,
+    existingEpisodes: Record<string, any>[] = [],
+    diagnosticContext?: EpisodeOutlineDiagnosticContext,
+  ) {
+    const expectedCount = toEpisode - fromEpisode + 1;
+    const jsonSchema = toEpisode === SEASON_OUTLINE_EPISODE_COUNT
+      ? this.buildEpisodeOutlineSchema(fromEpisode, toEpisode)
+      : undefined;
+    const { system, user } = this.prompts.buildPrompt('episode-outline-batch', {
       seasonFrameworkJson: this.stringifyJson(framework),
       seasonBibleJson: this.stringifyJson(seasonBible),
-      episodeCount: '96',
+      fromEpisode: String(fromEpisode),
+      toEpisode: String(toEpisode),
+      expectedEpisodeCount: String(expectedCount),
+      outlineResponseFormat: jsonSchema
+        ? '{ "episodes": [ ...exactly the requested outline items... ] }'
+        : '{ "episodes": [ ... ], "continuityCheck": { ... } }',
+      existingEpisodesJson: this.stringifyJson(existingEpisodes),
     });
 
-    try {
-      return await this.generateSeasonJson(system, user, { maxTokens: 30000, timeoutMs: 600000 });
-    } catch (error) {
-      this.logGenerationFallback('Episode outline', error);
-      return this.buildFallbackEpisodeOutline(framework, seasonBible);
+    let latestCompletion: OpenRouterJsonFailure | null = null;
+    const options: JsonGenerationOptions = {
+      timeoutMs: 600000,
+      reasoning: { effort: 'medium' },
+      jsonSchema,
+      onCompletion: (completion) => {
+        latestCompletion = completion;
+      },
+    };
+    let generated = await this.generateSeasonJson(system, user, options);
+    let validation = validateEpisodeOutlineRange(generated, fromEpisode, toEpisode);
+
+    if (!validation.valid && jsonSchema) {
+      await this.recordEpisodeOutlineValidationFailure(
+        diagnosticContext,
+        latestCompletion,
+        system,
+        user,
+        generated,
+        validation.issues,
+      );
+      latestCompletion = null;
+      generated = await this.generateSeasonJson(
+        system,
+        `${user}\n\nThe previous response was rejected because it did not satisfy the required episode range and fields. Return the complete corrected JSON object now: exactly episodes ${fromEpisode}-${toEpisode}, every number exactly once, and every required field populated.`,
+        options,
+      );
+      validation = validateEpisodeOutlineRange(generated, fromEpisode, toEpisode);
+      if (!validation.valid) {
+        await this.recordEpisodeOutlineValidationFailure(
+          diagnosticContext,
+          latestCompletion,
+          system,
+          user,
+          generated,
+          validation.issues,
+        );
+      }
     }
+
+    if (!validation.valid) {
+      throw new Error(`Episode outline batch ${fromEpisode}-${toEpisode} failed validation: ${validation.issues.join('; ')}`);
+    }
+    return {
+      episodeCount: SEASON_OUTLINE_EPISODE_COUNT,
+      episodes: validation.episodes,
+      continuityCheck: generated.continuityCheck || {},
+      generation: {
+        status: toEpisode >= SEASON_OUTLINE_EPISODE_COUNT ? 'ready' : 'pending',
+        generatedThrough: toEpisode,
+      },
+    };
+  }
+
+  private buildEpisodeOutlineSchema(fromEpisode: number, toEpisode: number): OpenRouterJsonSchema {
+    const requiredEpisodeFields = [
+      'episodeNumber',
+      'miniArcNumber',
+      'title',
+      'storyPurpose',
+      'conflict',
+      'vocabularyFocus',
+      'expectedChoiceTheme',
+      'stateChangeGoal',
+      'illustrationOpportunity',
+      'cliffhangerOrHook',
+    ];
+    return {
+      name: `storyhop_episode_outline_${fromEpisode}_${toEpisode}`,
+      strict: true,
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['episodes'],
+        properties: {
+          episodes: {
+            type: 'array',
+            minItems: toEpisode - fromEpisode + 1,
+            maxItems: toEpisode - fromEpisode + 1,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: requiredEpisodeFields,
+              properties: {
+                episodeNumber: { type: 'integer', enum: Array.from({ length: toEpisode - fromEpisode + 1 }, (_, index) => fromEpisode + index) },
+                miniArcNumber: { type: 'integer', minimum: 1, maximum: 12 },
+                title: { type: 'string', minLength: 3 },
+                storyPurpose: { type: 'string', minLength: 10 },
+                conflict: { type: 'string', minLength: 10 },
+                vocabularyFocus: { type: 'array', minItems: 1, maxItems: 4, items: { type: 'string', minLength: 2 } },
+                expectedChoiceTheme: { type: 'string', minLength: 3 },
+                stateChangeGoal: { type: 'string', minLength: 10 },
+                illustrationOpportunity: { type: 'string', minLength: 3 },
+                cliffhangerOrHook: { type: 'string', minLength: 3 },
+              },
+            },
+          },
+        },
+      },
+    };
+  }
+
+  private async recordEpisodeOutlineValidationFailure(
+    context: EpisodeOutlineDiagnosticContext | undefined,
+    completion: OpenRouterJsonFailure | null,
+    systemPrompt: string,
+    userPrompt: string,
+    generated: Record<string, any>,
+    validationIssues: string[],
+  ) {
+    if (!context) return;
+    const diagnosticId = await this.llmDiagnostics.record({
+      seasonId: context.seasonId,
+      jobId: context.jobId || null,
+      stage: 'episode_outline_extension',
+      attempt: context.attempt,
+      failureKind: 'episode_outline_validation_failed',
+      model: completion?.model || this.openRouter.getSeasonModel(),
+      requestedProvider: completion?.requestedProvider || null,
+      actualProvider: completion?.actualProvider || null,
+      durationMs: completion?.durationMs || null,
+      httpStatus: completion?.httpStatus || null,
+      responseId: completion?.responseId || null,
+      finishReason: completion?.finishReason || null,
+      usage: completion?.usage || null,
+      validationIssues,
+      payload: {
+        systemPrompt: completion?.requestSystemPrompt || systemPrompt,
+        userPrompt: completion?.requestUserPrompt || userPrompt,
+        rawResponse: completion?.rawResponse || generated,
+        content: completion?.content || this.stringifyJson(generated),
+        reasoning: completion?.reasoning || '',
+        generated,
+      },
+    });
+    this.logger.error(
+      `[EpisodeOutline] validation_failed diagnosticId=${diagnosticId || 'unavailable'} seasonId=${context.seasonId} jobId=${context.jobId || 'manual'} issues=${validationIssues.join('; ')}`,
+    );
+    void this.analytics.capture('season_outline_extension_validation_failed', context.ownerUserId, {
+      stage: 'episode_outline_extension',
+      model: completion?.model || this.openRouter.getSeasonModel(),
+      actual_provider: completion?.actualProvider || null,
+      validation_issue_count: validationIssues.length,
+    });
+  }
+
+  private async enqueueSeasonOutlineExtensionJob(seasonId: string, outline: Record<string, any>) {
+    const generatedThrough = Number(outline?.generation?.generatedThrough || outline?.episodes?.length || 0);
+    if (generatedThrough >= SEASON_OUTLINE_EPISODE_COUNT) return;
+
+    const active = await this.generationJobsRepository.findOne({
+      where: [
+        { seasonId, jobType: 'season_outline_extension', status: 'pending' },
+        { seasonId, jobType: 'season_outline_extension', status: 'processing' },
+      ],
+    });
+    if (active) return;
+
+    const now = new Date();
+    await this.generationJobsRepository.save(this.generationJobsRepository.create({
+      jobId: uuidv4(),
+      seasonId,
+      episodeId: null,
+      jobType: 'season_outline_extension',
+      status: 'pending',
+      payload: { fromEpisode: generatedThrough + 1, toEpisode: SEASON_OUTLINE_EPISODE_COUNT },
+      result: {},
+      error: null,
+      promptVersion: SEASON_OUTLINE_EXTENSION_PROMPT_VERSION,
+      createdAt: now,
+      updatedAt: now,
+    }));
+    this.logPipelineStep('season_outline_extension_queued', {
+      seasonId, fromEpisode: generatedThrough + 1, toEpisode: SEASON_OUTLINE_EPISODE_COUNT,
+    });
   }
 
   private async generateHeroProfileAndVisualBrief(
@@ -6132,12 +6402,7 @@ The image should make ${childName}'s season feel personal, magical, and immediat
       parentSettingsJson: this.buildParentSettingsJson(seasonSetup),
     });
 
-    try {
-      return await this.generateSeasonJson(system, user, { maxTokens: 4000 });
-    } catch (error) {
-      this.logGenerationFallback('Hero profile', error);
-      return this.buildFallbackHero(preferences, framework, seasonSetup, childProfile);
-    }
+    return this.generateSeasonJson(system, user);
   }
 
   private async generateHeroDraftDefaults(
@@ -6204,7 +6469,6 @@ Return JSON:
       const result = await this.generateSeasonJson(systemPrompt, userPrompt, {
         reasoning: { enabled: false },
         temperature: 0.35,
-        maxTokens: 2600,
       });
       const draft = this.normalizeHeroDraftDefaults(result, childProfile);
       if (this.isUsableHeroDraft(draft, childProfile)) {
@@ -6230,7 +6494,6 @@ Return JSON:
           model: this.openRouter.getSeasonFallbackModel(),
           reasoning: { enabled: false },
           temperature: 0.35,
-          maxTokens: 2600,
         },
       );
       const repairedDraft = this.normalizeHeroDraftDefaults(repaired, childProfile);
@@ -7252,6 +7515,148 @@ The image must be suitable as a visual consistency reference for future story il
     return true;
   }
 
+  private async processSeasonOutlineExtensionJob(job: GenerationJob) {
+    const claimed = await this.claimPendingJob(job);
+    if (!claimed) return { jobId: job.jobId, status: 'skipped' };
+
+    try {
+      const season = await this.seasonsRepository.findOne({ where: { seasonId: job.seasonId } });
+      if (!season) throw new Error('Season not found');
+      const seasonFramework = await this.seasonFrameworksRepository.findOne({ where: { seasonId: job.seasonId } });
+      if (!seasonFramework) throw new Error('Season framework not found');
+
+      const existingOutline = seasonFramework.episodeOutline || {};
+      const existingEpisodes = Array.isArray(existingOutline.episodes) ? existingOutline.episodes : [];
+      const generatedThrough = Math.max(
+        Number(existingOutline?.generation?.generatedThrough || 0),
+        ...existingEpisodes.map((item: any) => Number(item?.episodeNumber) || 0),
+      );
+      if (generatedThrough >= SEASON_OUTLINE_EPISODE_COUNT) {
+        job.status = 'ready';
+        job.result = { skipped: true, generatedThrough };
+        job.error = null;
+        job.updatedAt = new Date();
+        await this.generationJobsRepository.save(job);
+        return { jobId: job.jobId, status: 'ready', skipped: true };
+      }
+
+      const generated = await this.generateEpisodeOutline(
+        seasonFramework.framework || {},
+        seasonFramework.seasonBible || {},
+        generatedThrough + 1,
+        SEASON_OUTLINE_EPISODE_COUNT,
+        existingEpisodes,
+        {
+          seasonId: season.seasonId,
+          ownerUserId: season.ownerUserId,
+          jobId: job.jobId,
+          attempt: 1,
+        },
+      );
+      const mergedEpisodes = [...existingEpisodes, ...generated.episodes]
+        .sort((left, right) => Number(left.episodeNumber) - Number(right.episodeNumber));
+      seasonFramework.episodeOutline = {
+        ...existingOutline,
+        episodeCount: SEASON_OUTLINE_EPISODE_COUNT,
+        episodes: mergedEpisodes,
+        continuityCheck: generated.continuityCheck || existingOutline.continuityCheck || {},
+        generation: { status: 'ready', generatedThrough: SEASON_OUTLINE_EPISODE_COUNT },
+      };
+      seasonFramework.updatedAt = new Date();
+      await this.seasonFrameworksRepository.save(seasonFramework);
+      await this.enqueueChoicesWaitingForOutline(job.seasonId, seasonFramework.episodeOutline.episodes);
+
+      job.status = 'ready';
+      job.result = { generatedFrom: generatedThrough + 1, generatedThrough: SEASON_OUTLINE_EPISODE_COUNT };
+      job.error = null;
+      job.updatedAt = new Date();
+      await this.generationJobsRepository.save(job);
+      this.logPipelineStep('season_outline_extension_ready', {
+        seasonId: job.seasonId,
+        jobId: job.jobId,
+        generatedFrom: generatedThrough + 1,
+        generatedThrough: SEASON_OUTLINE_EPISODE_COUNT,
+      });
+      return { jobId: job.jobId, status: 'ready' };
+    } catch (error) {
+      job.status = 'failed';
+      job.error = this.formatGenerationError(error);
+      job.updatedAt = new Date();
+      await this.generationJobsRepository.save(job);
+      this.logPipelineStep('season_outline_extension_failed', {
+        seasonId: job.seasonId, jobId: job.jobId, error: job.error,
+      });
+      return { jobId: job.jobId, status: 'failed', error: job.error };
+    }
+  }
+
+  private async enqueueChoicesWaitingForOutline(seasonId: string, outlineEpisodes: Record<string, any>[]) {
+    const availableEpisodeNumbers = new Set(
+      outlineEpisodes.map((item) => Number(item?.episodeNumber)).filter(Number.isInteger),
+    );
+    const queuedChoices = await this.episodeChoicesRepository.find({
+      where: { seasonId, generationStatus: 'queued' },
+    });
+    const now = new Date();
+    for (const choice of queuedChoices) {
+      const targetEpisodeNumber = Number(choice.targetEpisodeNumber || choice.episodeNumber + 1);
+      if (!availableEpisodeNumbers.has(targetEpisodeNumber)) {
+        continue;
+      }
+      const existingEpisode = await this.episodesRepository.findOne({
+        where: { seasonId, episodeNumber: targetEpisodeNumber },
+      });
+      if (existingEpisode) {
+        continue;
+      }
+      const queuedJob = await this.enqueueEpisodeChoiceGenerationJob(choice, now);
+      this.logPipelineStep('choice_generation_resumed_after_outline_extension', {
+        seasonId,
+        episodeId: choice.episodeId,
+        choiceId: choice.choiceId,
+        nextEpisodeNumber: targetEpisodeNumber,
+        choiceRecordId: choice.choiceRecordId,
+        jobId: queuedJob.jobId,
+      });
+    }
+  }
+
+  private async enqueueEpisodeChoiceGenerationJob(choice: EpisodeChoice, now = new Date()): Promise<GenerationJob> {
+    const activeJob = choice.generationJobId
+      ? await this.generationJobsRepository.findOne({ where: { jobId: choice.generationJobId } })
+      : null;
+    if (activeJob && ['pending', 'processing'].includes(activeJob.status)) {
+      return activeJob;
+    }
+
+    const nextEpisodeNumber = Number(choice.targetEpisodeNumber || choice.episodeNumber + 1);
+    const job = await this.generationJobsRepository.save(
+      this.generationJobsRepository.create({
+        jobId: uuidv4(),
+        seasonId: choice.seasonId,
+        episodeId: choice.episodeId,
+        jobType: 'episode_choice_generation',
+        status: 'pending',
+        payload: {
+          sourceEpisodeId: choice.episodeId,
+          choiceId: choice.choiceId,
+          nextEpisodeNumber,
+          choiceRecordId: choice.choiceRecordId,
+          attemptCount: Number(activeJob?.payload?.attemptCount || 0),
+        },
+        result: {},
+        error: null,
+        promptVersion: EPISODE_PROMPT_VERSION,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    choice.generationJobId = job.jobId;
+    choice.updatedAt = now;
+    await this.episodeChoicesRepository.save(choice);
+    return job;
+  }
+
   private async processSeasonBootstrapJob(job: GenerationJob) {
     const claimed = await this.claimPendingJob(job);
     if (!claimed) return { jobId: job.jobId, status: 'skipped' };
@@ -7370,7 +7775,6 @@ The image must be suitable as a visual consistency reference for future story il
         : await this.generateSeasonJson(system, user, {
             reasoning: { enabled: false },
             temperature: 0.3,
-            maxTokens: 300,
           });
       const title = String(generated?.title || '').trim();
       if (!this.isUsableSeasonTitle(title)) {
