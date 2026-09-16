@@ -41,7 +41,6 @@ export type TTIPromptInput = {
     colorMood?: string;
     avoid?: string[];
   };
-  heroReferenceImageUrl?: string;
   visualManifest: EpisodeVisualManifest;
 };
 
@@ -59,11 +58,6 @@ export type TTIPromptOutput = {
   environment: string;
   positivePrompt: string;
   negativePrompt: string;
-  referenceImages?: Array<{
-    characterId?: string;
-    url: string;
-    use: string;
-  }>;
   validation?: {
     valid: boolean;
     issues: string[];

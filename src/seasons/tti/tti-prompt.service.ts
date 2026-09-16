@@ -140,10 +140,7 @@ export class TtiPromptService {
       'magical lighting',
     ].filter(Boolean);
 
-    const referenceImages = this.buildReferenceImages(input, manifest, context?.roster || []);
-    const referenceSuffix = referenceImages.length
-      ? 'same storybook style as the provided hero reference image'
-      : 'polished 2D painted children\'s storybook illustration style';
+    const referenceSuffix = 'polished 2D painted children\'s storybook illustration style';
 
     const intro =
       'Create an original polished 2D painted children\'s storybook illustration of one specific storybook moment.';
@@ -174,7 +171,6 @@ export class TtiPromptService {
       environment: momentText || manifest.environment?.visualDescription || '',
       positivePrompt,
       negativePrompt,
-      referenceImages,
     };
   }
 
@@ -461,24 +457,6 @@ export class TtiPromptService {
     }
 
     return Array.from(byKey.values());
-  }
-
-  private buildReferenceImages(
-    input: TTIPromptInput,
-    manifest: EpisodeVisualManifest,
-    roster: SeasonCharacter[],
-  ): TTIPromptOutput['referenceImages'] {
-    const images: NonNullable<TTIPromptOutput['referenceImages']> = [];
-    const heroRef = input.heroReferenceImageUrl || manifest.selectedCharacters.find((c) => c.referenceImageUrl)?.referenceImageUrl;
-    if (heroRef && heroRef.startsWith('http')) {
-      const hero = roster.find((item) => item.role === 'main_hero');
-      images.push({
-        characterId: hero?.characterId,
-        url: heroRef,
-        use: hero?.referenceUse || 'preserve identity, proportions, outfit, colors, and storybook style',
-      });
-    }
-    return images;
   }
 
   private getSearchTerms(character: SeasonCharacter): string[] {

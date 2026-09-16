@@ -80,7 +80,7 @@ const PREPARED_PROSE_PROMPT_VERSION = 'prepared-next-v3';
 const TTS_JOB_PROMPT_VERSION = 'tts-job-v2';
 const READING_ALIGNMENT_JOB_PROMPT_VERSION = 'reading-alignment-v1';
 const SEASON_TITLE_PROMPT_VERSION = 'season-title-v1';
-const SEASON_OUTLINE_EXTENSION_PROMPT_VERSION = 'outline-batch-v1';
+const SEASON_OUTLINE_EXTENSION_PROMPT_VERSION = 'outline-batch-v2';
 const INITIAL_OUTLINE_EPISODE_COUNT = 5;
 const SEASON_OUTLINE_EPISODE_COUNT = 96;
 const EPISODE_MIN_WORDS = 240;
@@ -219,9 +219,9 @@ type WritingState = {
 @Injectable()
 export class SeasonsService {
   // Coalesce visual work per season. `getSeason` is polled by the creation UI, so
-  // duplicate requests must observe the same in-flight hero/cover generation.
+  // duplicate requests must observe the same in-flight cover generation.
   private readonly visualBackfillInFlight = new Map<string, Promise<void>>();
-  private readonly heroReferenceImageInFlight = new Map<string, Promise<void>>();
+  private readonly initialEpisodeIllustrationInFlight = new Map<string, Promise<void>>();
   private readonly seasonCoverInFlight = new Map<string, Promise<void>>();
   private readonly seasonTitleQueueInFlight = new Map<string, Promise<void>>();
   private readonly queuedReadingAlignmentJobIds: string[] = [];
@@ -376,6 +376,7 @@ export class SeasonsService {
       storyDirection: payload.storyDirection || null,
       heroDirection: payload.heroDirection || null,
       storyWorld: this.resolveStoryWorldContext(payload.storyDirection, payload.world),
+      initialEpisodeIllustrationStatus: 'pending',
     };
 
     const seasonsRepository = manager?.getRepository(Season) || this.seasonsRepository;
@@ -397,7 +398,7 @@ export class SeasonsService {
       updatedAt: now,
     });
     await seasonsRepository.save(season);
-    await this.getOrCreateCrystalWallet(payload.ownerUserId, seasonId);
+    await this.getOrCreateCrystalWallet(payload.ownerUserId, seasonId, manager);
 
     const seasonFramework = frameworksRepository.create({
       id: uuidv4(),
@@ -1466,6 +1467,11 @@ export class SeasonsService {
     let seasonFramework = await this.seasonFrameworksRepository.findOne({ where: { seasonId } });
     if (!seasonFramework) {
       throw new Error('Season framework not found');
+    }
+
+    if (season.status === 'episode_ready' && !season.seasonSetup?.seasonCoverImageUrl) {
+      void this.backfillSeasonVisuals(seasonId, { forceCover: true });
+      return this.getSeason(seasonId);
     }
 
     await this.enqueueSeasonBootstrapJob(season, seasonFramework);
@@ -3444,6 +3450,7 @@ export class SeasonsService {
       storyIntroText,
     );
     await this.prepareEpisodeIllustration(seasonId, createdEpisode, hero);
+    void this.prepareInitialEpisodeIllustrationInBackground(seasonId);
 
     season.currentEpisodeNumber = createdEpisode.episodeNumber;
     season.currentMiniArc = createdEpisode.miniArcNumber;
@@ -4893,8 +4900,8 @@ export class SeasonsService {
     }
 
     const hero = await this.heroesRepository.findOne({ where: { seasonId } });
-    if (!hero?.heroReferenceImageUrl) {
-      throw new Error('Hero reference image is not ready yet');
+    if (!hero) {
+      throw new Error('Hero is not ready yet');
     }
 
     const candidate = episode.illustrationCandidate || {};
@@ -5218,8 +5225,8 @@ export class SeasonsService {
     season.status = 'hero_ready';
     season.seasonSetup = {
       ...(season.seasonSetup || {}),
-      heroReferenceImageGenerationStatus: 'pending',
-      heroReferenceImageGenerationError: null,
+      seasonCoverGenerationStatus: season.seasonSetup?.seasonCoverImageUrl ? 'ready' : 'pending',
+      seasonCoverGenerationError: null,
     };
     season.updatedAt = now;
     await this.seasonsRepository.save(season);
@@ -5233,81 +5240,64 @@ export class SeasonsService {
       );
     }
 
-    void this.generateHeroReferenceImageInBackground(
-      seasonId,
-      generatedHero.heroProfile,
-      generatedHero.heroVisualBrief,
-    );
+    void this.generateSeasonCoverInBackground(seasonId);
 
     return this.getSeason(seasonId);
   }
 
-  private async generateHeroReferenceImageInBackground(
-    seasonId: string,
-    heroProfile: Record<string, any>,
-    heroVisualBrief: Record<string, any>,
-  ) {
-    const existing = this.heroReferenceImageInFlight.get(seasonId);
+  /**
+   * Episode 1 illustration is queued independently from the season cover, so
+   * neither visual job delays the reader or charges the child's crystal wallet.
+   */
+  private async prepareInitialEpisodeIllustrationInBackground(seasonId: string) {
+    const existing = this.initialEpisodeIllustrationInFlight.get(seasonId);
     if (existing) {
       return existing;
     }
 
     const task = (async () => {
-      try {
-        const hero = await this.heroesRepository.findOne({ where: { seasonId } });
-        if (!hero || hero.heroReferenceImageUrl) {
-          return;
-        }
-        const season = await this.seasonsRepository.findOne({ where: { seasonId } });
-        if (!season || season.seasonSetup?.heroReferenceImageGenerationStatus === 'failed') {
-          return;
-        }
-        season.seasonSetup = {
-          ...(season.seasonSetup || {}),
-          heroReferenceImageGenerationStatus: 'processing',
-          heroReferenceImageGenerationError: null,
-        };
-        season.updatedAt = new Date();
-        await this.seasonsRepository.save(season);
-        const heroReferenceImageUrl = await this.generateHeroReferenceImage(
-          seasonId,
-          heroProfile,
-          heroVisualBrief,
-        );
-        hero.heroReferenceImageUrl = heroReferenceImageUrl || null;
-        hero.updatedAt = new Date();
-        await this.heroesRepository.save(hero);
-        season.seasonSetup = {
-          ...(season.seasonSetup || {}),
-          heroReferenceImageGenerationStatus: 'ready',
-          heroReferenceImageGenerationError: null,
-        };
-        season.updatedAt = new Date();
-        await this.seasonsRepository.save(season);
-        void this.generateSeasonCoverInBackground(seasonId);
-      } catch (error) {
+      const [episode, hero] = await Promise.all([
+        this.episodesRepository.findOne({ where: { seasonId, episodeNumber: 1 } }),
+        this.heroesRepository.findOne({ where: { seasonId } }),
+      ]);
+      if (!episode || !hero) {
+        return;
+      }
+
+      const storybookEntryId = await this.prepareEpisodeIllustration(seasonId, episode, hero);
+      if (storybookEntryId) {
         const season = await this.seasonsRepository.findOne({ where: { seasonId } });
         if (season) {
-          season.seasonSetup = {
-            ...(season.seasonSetup || {}),
-            heroReferenceImageGenerationStatus: 'failed',
-            heroReferenceImageGenerationError: this.formatGenerationError(error),
-          };
-          season.updatedAt = new Date();
-          await this.seasonsRepository.save(season);
+          await this.patchSeasonSetup(seasonId, {
+            initialEpisodeIllustrationStatus: 'queued',
+          });
         }
-        this.logger.warn(
-          `[HeroReferenceImage] Failed to backfill hero reference image for seasonId=${seasonId}: ${error instanceof Error ? error.message : String(error)}`,
-        );
       }
-    })().finally(() => this.heroReferenceImageInFlight.delete(seasonId));
+      this.logPipelineStep('initial_episode_illustration_checked', {
+        seasonId,
+        episodeId: episode.episodeId,
+        queued: Boolean(storybookEntryId),
+      });
+    })()
+      .catch((error) => {
+        this.logger.error(
+          `[InitialEpisodeIllustration] Failed seasonId=${seasonId} | ${this.formatGenerationError(error)}`,
+        );
+      })
+      .finally(() => this.initialEpisodeIllustrationInFlight.delete(seasonId));
 
-    this.heroReferenceImageInFlight.set(seasonId, task);
+    this.initialEpisodeIllustrationInFlight.set(seasonId, task);
     return task;
   }
 
   private async ensureSeasonVisualAssetsInBackground(seasonId: string) {
     if (this.visualBackfillInFlight.has(seasonId)) {
+      return;
+    }
+
+    const season = await this.seasonsRepository.findOne({ where: { seasonId } });
+    const coverStatus = String(season?.seasonSetup?.seasonCoverGenerationStatus || '');
+    if (!season || !coverStatus) {
       return;
     }
 
@@ -5325,7 +5315,7 @@ export class SeasonsService {
 
   async backfillSeasonVisuals(
     seasonId: string,
-    options: { forceCover?: boolean; forceHeroReference?: boolean } = {},
+    options: { forceCover?: boolean } = {},
   ) {
     const season = await this.seasonsRepository.findOne({ where: { seasonId } });
     const hero = await this.heroesRepository.findOne({ where: { seasonId } });
@@ -5334,74 +5324,54 @@ export class SeasonsService {
       throw new Error('Season hero or framework not found');
     }
 
-    let heroGenerated = false;
     let coverGenerated = false;
-
-    const heroReferenceStatus = String(season.seasonSetup?.heroReferenceImageGenerationStatus || '');
-    const shouldGenerateHeroReference =
-      !hero.heroReferenceImageUrl &&
-      (options.forceHeroReference || heroReferenceStatus !== 'failed');
-
-    if (shouldGenerateHeroReference) {
-      await this.generateHeroReferenceImageInBackground(
-        seasonId,
-        hero.heroProfile || {},
-        hero.heroVisualBrief || {},
-      );
-      heroGenerated = true;
-    }
-
-    const refreshedHero = await this.heroesRepository.findOne({ where: { seasonId } });
     const refreshedSeason = await this.seasonsRepository.findOne({ where: { seasonId } });
     const coverStatus = String(refreshedSeason?.seasonSetup?.seasonCoverGenerationStatus || '');
+    const coverUpdatedAt = refreshedSeason?.updatedAt?.getTime() || 0;
     const stuckProcessing =
-      coverStatus === 'processing' && !refreshedSeason?.seasonSetup?.seasonCoverImageUrl;
+      coverStatus === 'processing' &&
+      !refreshedSeason?.seasonSetup?.seasonCoverImageUrl &&
+      Date.now() - coverUpdatedAt > 20 * 60 * 1000;
     const needsCover =
-      Boolean(refreshedHero?.heroReferenceImageUrl) &&
-      (!refreshedSeason?.seasonSetup?.seasonCoverImageUrl ||
-        (options.forceCover && coverStatus === 'failed') ||
-        stuckProcessing);
+      !refreshedSeason?.seasonSetup?.seasonCoverImageUrl &&
+      (coverStatus === 'pending' ||
+        !coverStatus ||
+        stuckProcessing ||
+        (options.forceCover && coverStatus === 'failed'));
 
     if (needsCover) {
       if (
         refreshedSeason &&
         (stuckProcessing || (options.forceCover && coverStatus === 'failed'))
       ) {
-        refreshedSeason.seasonSetup = {
-          ...(refreshedSeason.seasonSetup || {}),
-          seasonCoverGenerationStatus: undefined,
-        };
-        refreshedSeason.updatedAt = new Date();
-        await this.seasonsRepository.save(refreshedSeason);
+        await this.patchSeasonSetup(seasonId, { seasonCoverGenerationStatus: null });
       }
       await this.generateSeasonCoverInBackground(seasonId);
       coverGenerated = true;
     }
 
     const finalSeason = await this.seasonsRepository.findOne({ where: { seasonId } });
-    const finalHero = await this.heroesRepository.findOne({ where: { seasonId } });
+    if (finalSeason?.seasonSetup?.initialEpisodeIllustrationStatus === 'pending') {
+      await this.prepareInitialEpisodeIllustrationInBackground(seasonId);
+    }
 
     return {
       seasonId,
       theme: finalSeason?.seasonSetup?.theme || null,
-      heroReferenceImageUrl: this.mapStorageUrl(finalHero?.heroReferenceImageUrl),
       seasonCoverImageUrl: this.mapStorageUrl(finalSeason?.seasonSetup?.seasonCoverImageUrl),
       seasonCoverGenerationStatus: finalSeason?.seasonSetup?.seasonCoverGenerationStatus || null,
-      heroGenerated,
       coverGenerated,
-      skipped: !heroGenerated && !coverGenerated,
+      skipped: !coverGenerated,
     };
   }
 
   async backfillAllSeasonVisuals(
-    options: { forceFailedCovers?: boolean; forceFailedHeroReferences?: boolean } = {},
+    options: { forceFailedCovers?: boolean } = {},
   ) {
     const seasons = await this.seasonsRepository.find({ order: { updatedAt: 'DESC' } });
     const results: Record<string, any>[] = [];
 
     for (const season of seasons) {
-      const hero = await this.heroesRepository.findOne({ where: { seasonId: season.seasonId } });
-      const missingHero = !hero?.heroReferenceImageUrl;
       const missingCover = !season.seasonSetup?.seasonCoverImageUrl;
       const failedCover =
         options.forceFailedCovers && season.seasonSetup?.seasonCoverGenerationStatus === 'failed';
@@ -5409,13 +5379,7 @@ export class SeasonsService {
         season.seasonSetup?.seasonCoverGenerationStatus === 'processing' &&
         !season.seasonSetup?.seasonCoverImageUrl;
 
-      const heroReferenceFailed = season.seasonSetup?.heroReferenceImageGenerationStatus === 'failed';
-      const retryFailedHeroReference =
-        options.forceFailedHeroReferences && heroReferenceFailed;
-      if (
-        (heroReferenceFailed && !retryFailedHeroReference) ||
-        (!missingHero && !missingCover && !failedCover && !stuckCover && !retryFailedHeroReference)
-      ) {
+      if (!missingCover && !failedCover && !stuckCover) {
         results.push({
           seasonId: season.seasonId,
           theme: season.seasonSetup?.theme || null,
@@ -5427,8 +5391,7 @@ export class SeasonsService {
       try {
         results.push(
           await this.backfillSeasonVisuals(season.seasonId, {
-            forceCover: failedCover || missingCover,
-            forceHeroReference: retryFailedHeroReference,
+            forceCover: failedCover,
           }),
         );
       } catch (error) {
@@ -5460,7 +5423,7 @@ export class SeasonsService {
       const season = await this.seasonsRepository.findOne({ where: { seasonId } });
       const framework = await this.seasonFrameworksRepository.findOne({ where: { seasonId } });
       const hero = await this.heroesRepository.findOne({ where: { seasonId } });
-      if (!season || !framework || !hero?.heroReferenceImageUrl) {
+      if (!season || !framework || !hero) {
         return;
       }
 
@@ -5469,12 +5432,10 @@ export class SeasonsService {
         return;
       }
 
-      season.seasonSetup = {
-        ...(season.seasonSetup || {}),
+      await this.patchSeasonSetup(seasonId, {
         seasonCoverGenerationStatus: 'processing',
-      };
-      season.updatedAt = new Date();
-      await this.seasonsRepository.save(season);
+        seasonCoverGenerationError: null,
+      });
 
       const prompt = this.buildSeasonCoverPrompt(
         season.childProfile || {},
@@ -5494,23 +5455,16 @@ export class SeasonsService {
         return;
       }
 
-      refreshed.seasonSetup = {
-        ...(refreshed.seasonSetup || {}),
+      await this.patchSeasonSetup(seasonId, {
         seasonCoverImageUrl: generation.imageUrl,
         seasonCoverGenerationStatus: 'ready',
-      };
-      refreshed.updatedAt = new Date();
-      await this.seasonsRepository.save(refreshed);
+        seasonCoverGenerationError: null,
+      });
       } catch (error) {
-        const season = await this.seasonsRepository.findOne({ where: { seasonId } });
-        if (season) {
-          season.seasonSetup = {
-            ...(season.seasonSetup || {}),
-            seasonCoverGenerationStatus: 'failed',
-          };
-          season.updatedAt = new Date();
-          await this.seasonsRepository.save(season);
-        }
+        await this.patchSeasonSetup(seasonId, {
+          seasonCoverGenerationStatus: 'failed',
+          seasonCoverGenerationError: this.formatGenerationError(error),
+        });
         this.logger.warn(
           `[SeasonCover] Failed to generate season cover for seasonId=${seasonId}: ${error instanceof Error ? error.message : String(error)}`,
         );
@@ -5519,6 +5473,23 @@ export class SeasonsService {
 
     this.seasonCoverInFlight.set(seasonId, task);
     return task;
+  }
+
+  /**
+   * Visual jobs can finish after the first episode. They must update only their
+   * own JSON keys and never restore an older season status from memory.
+   */
+  private async patchSeasonSetup(seasonId: string, patch: Record<string, unknown>) {
+    await this.seasonsRepository
+      .createQueryBuilder()
+      .update(Season)
+      .set({
+        seasonSetup: () => `COALESCE("seasonSetup", '{}'::jsonb) || :patch::jsonb`,
+        updatedAt: () => 'CURRENT_TIMESTAMP',
+      })
+      .where({ seasonId })
+      .setParameter('patch', JSON.stringify(patch))
+      .execute();
   }
 
   private buildSeasonCoverPrompt(
@@ -5558,7 +5529,7 @@ Style guide:
 ${visualStyle}
 
 Requirements:
-- show the main child hero clearly and consistently with the reference look
+- show the main child hero clearly and consistently with the hero profile and visual brief
 - include a rich view of the season world/environment
 - communicate wonder, adventure, and the main season mystery
 - child-safe fantasy mood, warm polished storybook lighting
@@ -5603,8 +5574,14 @@ The image should make ${childName}'s season feel personal, magical, and immediat
     return generatedDefaults;
   }
 
-  private async getOrCreateCrystalWallet(ownerUserId: string, seasonId?: string) {
-    const ownerWallets = await this.crystalWalletsRepository.find({
+  private async getOrCreateCrystalWallet(
+    ownerUserId: string,
+    seasonId?: string,
+    manager?: EntityManager,
+  ) {
+    const walletsRepository = manager?.getRepository(CrystalWallet) || this.crystalWalletsRepository;
+    const ledgerRepository = manager?.getRepository(CrystalLedgerEntry) || this.crystalLedgerRepository;
+    const ownerWallets = await walletsRepository.find({
       where: { ownerUserId },
       order: { createdAt: 'ASC' },
     });
@@ -5616,7 +5593,7 @@ The image should make ${childName}'s season feel personal, magical, and immediat
       if (!seasonId) {
         throw new Error(`Crystal wallet season context is required for first wallet creation: ${ownerUserId}`);
       }
-      primaryWallet = this.crystalWalletsRepository.create({
+      primaryWallet = walletsRepository.create({
         walletId: uuidv4(),
         ownerUserId,
         seasonId,
@@ -5628,7 +5605,7 @@ The image should make ${childName}'s season feel personal, magical, and immediat
       createdInitialWallet = true;
     }
 
-    const normalizedBalance = await this.computeOwnerCrystalBalance(ownerUserId);
+    const normalizedBalance = await this.computeOwnerCrystalBalance(ownerUserId, manager);
     for (const wallet of ownerWallets) {
       wallet.ownerUserId = ownerUserId;
       wallet.seasonId = wallet.seasonId || seasonId || primaryWallet.seasonId;
@@ -5636,10 +5613,10 @@ The image should make ${childName}'s season feel personal, magical, and immediat
       wallet.updatedAt = now;
     }
 
-    const savedWallets = await this.crystalWalletsRepository.save(ownerWallets);
+    const savedWallets = await walletsRepository.save(ownerWallets);
     if (createdInitialWallet) {
-      await this.crystalLedgerRepository.save(
-        this.crystalLedgerRepository.create({
+      await ledgerRepository.save(
+        ledgerRepository.create({
           ledgerEntryId: uuidv4(),
           walletId: savedWallets[0].walletId,
           ownerUserId,
@@ -5651,7 +5628,7 @@ The image should make ${childName}'s season feel personal, magical, and immediat
           createdAt: now,
         }),
       );
-      return this.getOrCreateCrystalWallet(ownerUserId, seasonId);
+      return this.getOrCreateCrystalWallet(ownerUserId, seasonId, manager);
     }
     return savedWallets[0];
   }
@@ -5666,8 +5643,9 @@ The image should make ${childName}'s season feel personal, magical, and immediat
     };
   }
 
-  private async computeOwnerCrystalBalance(ownerUserId: string) {
-    const ledgerEntries = await this.crystalLedgerRepository.find({
+  private async computeOwnerCrystalBalance(ownerUserId: string, manager?: EntityManager) {
+    const ledgerRepository = manager?.getRepository(CrystalLedgerEntry) || this.crystalLedgerRepository;
+    const ledgerEntries = await ledgerRepository.find({
       where: { ownerUserId },
       order: { createdAt: 'ASC' },
     });
@@ -6202,18 +6180,17 @@ The image should make ${childName}'s season feel personal, magical, and immediat
     diagnosticContext?: EpisodeOutlineDiagnosticContext,
   ) {
     const expectedCount = toEpisode - fromEpisode + 1;
-    const jsonSchema = toEpisode === SEASON_OUTLINE_EPISODE_COUNT
-      ? this.buildEpisodeOutlineSchema(fromEpisode, toEpisode)
-      : undefined;
+    // Every outline batch is persisted and can unlock the first chapter.
+    // Keep the provider constrained from the first 1-5 batch onward rather
+    // than relying solely on post-response validation for partial batches.
+    const jsonSchema = this.buildEpisodeOutlineSchema(fromEpisode, toEpisode);
     const { system, user } = this.prompts.buildPrompt('episode-outline-batch', {
       seasonFrameworkJson: this.stringifyJson(framework),
       seasonBibleJson: this.stringifyJson(seasonBible),
       fromEpisode: String(fromEpisode),
       toEpisode: String(toEpisode),
       expectedEpisodeCount: String(expectedCount),
-      outlineResponseFormat: jsonSchema
-        ? '{ "episodes": [ ...exactly the requested outline items... ] }'
-        : '{ "episodes": [ ... ], "continuityCheck": { ... } }',
+      outlineResponseFormat: '{ "episodes": [ ...exactly the requested outline items... ] }',
       existingEpisodesJson: this.stringifyJson(existingEpisodes),
     });
 
@@ -6589,45 +6566,6 @@ Return JSON:
 
   private escapeRegExp(value: string) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
-
-  private async generateHeroReferenceImage(
-    seasonId: string,
-    heroProfile: Record<string, any>,
-    heroVisualBrief: Record<string, any>,
-  ) {
-    const prompt = `Create a clean full-body character reference image for a recurring hero in a children's interactive story.
-
-Hero profile:
-${JSON.stringify(heroProfile, null, 2)}
-
-Hero visual brief:
-${JSON.stringify(heroVisualBrief, null, 2)}
-
-Style:
-- warm, polished children's book illustration
-- friendly, expressive, age-appropriate
-- full-body centered character
-- simple light background
-- clear silhouette
-- consistent outfit and signature accessory
-- no text, no logo, no watermark, no UI
-- no scary, violent, sexualized, medical, political, or copyrighted elements
-
-The image must be suitable as a visual consistency reference for future story illustrations.`;
-
-    try {
-      const result = await this.openRouter.generateImage(prompt);
-      return this.uploadGeneratedImageWithRetry(
-        result.body,
-        result.contentType,
-        `seasons/${seasonId}/hero-reference.png`,
-        'openrouter-image-api',
-      );
-    } catch (error) {
-      this.logger.logOpenRouterError('generateHeroReferenceImage', error);
-      throw error;
-    }
   }
 
   private async generateEpisodeContent(
@@ -7121,7 +7059,7 @@ The image must be suitable as a visual consistency reference for future story il
     now: Date,
   ) {
     const candidate = episodeContent?.illustrationCandidate || {};
-    if (!candidate.shouldGenerate || !candidate.moment || !hero?.heroReferenceImageUrl) {
+    if (!candidate.shouldGenerate || !candidate.moment || !hero) {
       return;
     }
 
@@ -8848,7 +8786,7 @@ The image must be suitable as a visual consistency reference for future story il
         episodeNumber: episode.episodeNumber,
         preparedEpisodeId: preparedEpisode?.preparedEpisodeId || null,
         illustrationId,
-        heroReferenceReady: Boolean(hero?.heroReferenceImageUrl),
+        heroProfileReady: Boolean(hero),
       });
 
       return existingEntry.storybookEntryId;
@@ -8899,7 +8837,7 @@ The image must be suitable as a visual consistency reference for future story il
       episodeNumber: episode.episodeNumber,
       preparedEpisodeId: preparedEpisode?.preparedEpisodeId || null,
       illustrationId,
-      heroReferenceReady: Boolean(hero?.heroReferenceImageUrl),
+      heroProfileReady: Boolean(hero),
     });
 
     return storybookEntryId;
@@ -9143,7 +9081,7 @@ The image must be suitable as a visual consistency reference for future story il
     if (!candidate.shouldGenerate || !candidate.moment) {
       return null;
     }
-    if (!hero?.heroReferenceImageUrl) {
+    if (!hero) {
       return null;
     }
 
@@ -9304,16 +9242,11 @@ The image must be suitable as a visual consistency reference for future story il
       sceneCharacters: episode?.illustrationCandidate?.sceneCharacters || promptPayload.sceneCharacters || [],
     });
 
-    const heroReferenceImageUrl = this.isHttpUrl(hero.heroReferenceImageUrl)
-      ? hero.heroReferenceImageUrl
-      : undefined;
-
     const ttiInput = {
       episodeTitle,
       episodeNumber: Number(promptPayload.episodeNumber || episode?.episodeNumber || 0),
       moment,
       seasonStyleGuide: seasonBible.illustrationStyleGuide || seasonBible.illustrationStyle || {},
-      heroReferenceImageUrl,
       visualManifest,
     };
 
@@ -9425,10 +9358,6 @@ The image must be suitable as a visual consistency reference for future story il
       );
       return { imageUrl: generation.imageUrl, ttiPrompt: saferTtiPrompt, requestId: generation.requestId || null };
     }
-  }
-
-  private isHttpUrl(value: string | null | undefined): boolean {
-    return typeof value === 'string' && /^https?:\/\//i.test(value);
   }
 
   private async uploadToStorage(key: string, body: Buffer, contentType: string): Promise<string> {
@@ -9544,53 +9473,6 @@ The image must be suitable as a visual consistency reference for future story il
     });
   }
 
-  private buildProtectedContentFallbackPrompt(
-    heroProfile: Record<string, any>,
-    heroVisualBrief: Record<string, any>,
-    heroReferenceImageUrl: string | null,
-    sceneBrief: Record<string, any>,
-    imagePromptPayload: Record<string, any>,
-  ) {
-    const fallbackHero = this.stringifyPromptData(this.buildImageSafeHeroProfile(heroProfile), 600);
-    const fallbackVisual = this.stringifyPromptData(this.sanitizeImagePromptValue(heroVisualBrief || {}), 700);
-    const fallbackReference = this.buildHeroReferenceHint(heroReferenceImageUrl);
-    const fallbackSceneBrief = this.stringifyPromptData(sceneBrief, 1000);
-    const fallbackScene = this.stringifyPromptData({
-      moment: imagePromptPayload.moment,
-      visualGoal: 'Focus on one original fantasy story beat with clear emotion and readable action.',
-    }, 900);
-
-    return `Create an original children's fantasy illustration of one specific story beat.
-
-Hero anchor:
-${fallbackHero}
-
-Visual brief:
-${fallbackVisual}
-
-Hero reference image anchor:
-${fallbackReference}
-
-Scene brief:
-${fallbackSceneBrief}
-
-Scene beat:
-${fallbackScene}
-
-Requirements:
-- fully original world and character presentation
-- preserve the same hero identity, outfit, silhouette, palette, companion, and accessory from the hero reference
-- treat the scene brief as mandatory composition guidance
-- include every required character from the scene brief exactly once
-- show one clear action beat, not a poster, montage, or cover
-- render symbol walls, runes, maps, carvings, or writing-like elements only as abstract pictograms, never readable text
-- no franchise names, no branded dragons, no studio-specific designs, no copyrighted characters
-- warm, expressive, child-safe storybook illustration
-- one clear scene, readable pose, clean composition
-- no text, no top title, no map display, no extra random children, no crowd
-- no text, no watermark, no UI`;
-  }
-
   private buildIllustrationSceneBrief(
     promptPayload: Record<string, any>,
     heroProfile: Record<string, any>,
@@ -9630,7 +9512,7 @@ Requirements:
     const normalizedText = text.toLowerCase();
 
     if (heroName) {
-      required.push(`${heroName} - recurring child hero, must stay visually consistent with the hero reference`);
+      required.push(`${heroName} - recurring child hero, must stay visually consistent with the canonical hero profile`);
     }
 
     if (companionName && normalizedText.includes(companionName.toLowerCase())) {
@@ -9783,19 +9665,6 @@ Requirements:
     }
 
     return `${text.slice(0, Math.max(0, maxChars - 3)).trim()}...`;
-  }
-
-  private buildHeroReferenceHint(heroReferenceImageUrl: string | null | undefined) {
-    const value = String(heroReferenceImageUrl || '').trim();
-    if (!value) {
-      return 'No hero reference image URL available.';
-    }
-
-    if (value.startsWith('data:image/')) {
-      return 'Hero reference image exists in storage as an inline data URL fallback. Preserve the established hero look, outfit, silhouette, and accessory from prior episodes.';
-    }
-
-    return this.truncateText(value, 500);
   }
 
   private sanitizeImagePromptValue(value: any): any {
@@ -11353,61 +11222,4 @@ Requirements:
     };
   }
 
-  private buildFallbackHeroReferenceImage(heroProfile: Record<string, any>, heroVisualBrief: Record<string, any>) {
-    const accent = this.normalizeColor(heroVisualBrief.mainColors?.[0] || '#f59e0b');
-    const secondary = this.normalizeColor(heroVisualBrief.mainColors?.[1] || '#7dd3fc');
-    const bg = this.normalizeColor(heroVisualBrief.mainColors?.[2] || '#fde68a');
-    const accessory = this.escapeXml(heroVisualBrief.signatureAccessory || 'satchel');
-    const heroName = this.escapeXml(heroProfile.name || 'Hero');
-
-    const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="720" height="960" viewBox="0 0 720 960">
-  <rect width="720" height="960" rx="48" fill="${bg}" />
-  <circle cx="360" cy="220" r="130" fill="#fff8ef" />
-  <ellipse cx="360" cy="600" rx="190" ry="240" fill="${accent}" />
-  <ellipse cx="360" cy="535" rx="110" ry="140" fill="#fff8ef" />
-  <circle cx="318" cy="205" r="14" fill="#1f2937" />
-  <circle cx="402" cy="205" r="14" fill="#1f2937" />
-  <path d="M315 260 Q360 300 405 260" stroke="#1f2937" stroke-width="10" fill="none" stroke-linecap="round" />
-  <path d="M250 145 Q360 70 470 145" stroke="${secondary}" stroke-width="34" fill="none" stroke-linecap="round" />
-  <rect x="280" y="455" width="160" height="170" rx="48" fill="${secondary}" opacity="0.88" />
-  <rect x="188" y="565" width="72" height="220" rx="36" fill="${accent}" />
-  <rect x="460" y="565" width="72" height="220" rx="36" fill="${accent}" />
-  <rect x="170" y="420" width="92" height="220" rx="40" fill="${accent}" transform="rotate(18 170 420)" />
-  <rect x="458" y="420" width="92" height="220" rx="40" fill="${accent}" transform="rotate(-18 458 420)" />
-  <rect x="430" y="515" width="120" height="110" rx="26" fill="#fff8ef" stroke="#1f2937" stroke-width="6" />
-  <text x="490" y="565" text-anchor="middle" font-size="20" font-family="Trebuchet MS, Arial, sans-serif" fill="#1f2937">${accessory}</text>
-  <text x="360" y="860" text-anchor="middle" font-size="42" font-weight="700" font-family="Trebuchet MS, Arial, sans-serif" fill="#1f2937">${heroName}</text>
-</svg>`.trim();
-
-    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-  }
-
-
-  private normalizeColor(value: string) {
-    const palette: Record<string, string> = {
-      gold: '#f59e0b',
-      yellow: '#facc15',
-      coral: '#fb7185',
-      pink: '#f472b6',
-      blue: '#60a5fa',
-      'sky blue': '#7dd3fc',
-      green: '#4ade80',
-      mint: '#6ee7b7',
-      purple: '#c084fc',
-      orange: '#fb923c',
-      red: '#f87171',
-    };
-
-    return palette[value?.toLowerCase?.() || ''] || value || '#f59e0b';
-  }
-
-  private escapeXml(value: string) {
-    return value
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
-  }
 }

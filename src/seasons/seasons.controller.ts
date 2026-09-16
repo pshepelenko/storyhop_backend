@@ -7,6 +7,7 @@ import { SeasonOwnerGuard } from '../users/season-owner.guard';
 import { SessionAuthGuard } from '../users/session-auth.guard';
 import { assertMaintenanceRouteEnabled } from '../security/maintenance-route';
 import { SpeakingTranscriptionService } from './speaking-transcription.service';
+import { FileLogger } from '../logging/file-logger.service';
 
 @Controller('seasons')
 @UseGuards(SessionAuthGuard, SeasonOwnerGuard)
@@ -14,6 +15,7 @@ export class SeasonsController {
   constructor(
     private readonly seasonsService: SeasonsService,
     private readonly speakingTranscription: SpeakingTranscriptionService,
+    private readonly logger: FileLogger,
   ) {}
 
   @Post('hero-preview')
@@ -76,7 +78,9 @@ export class SeasonsController {
     try {
       return await this.seasonsService.startSeason({ ...body, ownerUserId: user.userId });
     } catch (error) {
-      console.error('Season start failed', error);
+      const message = error instanceof Error ? error.message : String(error);
+      const trace = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`[SeasonStart] failed ownerUserId=${user.userId} | ${message}`, trace);
       if (error instanceof HttpException) throw error;
       throw new HttpException(error?.message || 'Season start failed', HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -107,7 +111,7 @@ export class SeasonsController {
 
   @Post('visuals/backfill-all')
   async backfillAllSeasonVisuals(
-    @Body() body: { forceFailedCovers?: boolean; forceFailedHeroReferences?: boolean } = {},
+    @Body() body: { forceFailedCovers?: boolean } = {},
   ) {
     assertMaintenanceRouteEnabled();
     try {
@@ -333,7 +337,7 @@ export class SeasonsController {
   @Post(':seasonId/visuals/backfill')
   async backfillSeasonVisuals(
     @Param('seasonId') seasonId: string,
-    @Body() body: { forceCover?: boolean; forceHeroReference?: boolean } = {},
+    @Body() body: { forceCover?: boolean } = {},
   ) {
     assertMaintenanceRouteEnabled();
     try {

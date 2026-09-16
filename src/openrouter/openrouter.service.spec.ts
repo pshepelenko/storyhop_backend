@@ -65,6 +65,32 @@ describe('OpenRouterService image generation', () => {
     expect(logger.logOpenRouterError).toHaveBeenCalled();
   });
 
+  it('retries an image once after an OpenRouter safety rejection', async () => {
+    mockedAxios.post
+      .mockRejectedValueOnce({
+        response: {
+          status: 400,
+          data: { error: { message: 'Your request was rejected by the safety system.' } },
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          data: [{ b64_json: Buffer.from('image-bytes').toString('base64'), media_type: 'image/png' }],
+        },
+        headers: { 'x-request-id': 'request-after-safety-retry' },
+      } as any);
+    const service = new OpenRouterService(logger as any, prompts as any);
+
+    await expect(service.generateImage('A safe storybook scene')).resolves.toEqual({
+      body: Buffer.from('image-bytes'),
+      contentType: 'image/png',
+      requestId: 'request-after-safety-retry',
+    });
+    expect(mockedAxios.post).toHaveBeenCalledTimes(2);
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('safety rejection; retrying once'));
+    expect(logger.logOpenRouterError).not.toHaveBeenCalled();
+  });
+
   it('checks image-model availability without creating an image', async () => {
     mockedAxios.get.mockResolvedValue({ data: { data: [] } } as any);
     mockedAxios.post.mockResolvedValue({ data: { choices: [{ message: { content: 'pong' } }] } } as any);
@@ -180,6 +206,23 @@ describe('OpenRouterService season framework completions', () => {
     );
   });
 
+  it('uses the configured Luna Pro season model', async () => {
+    process.env.OPENROUTER_SEASON_MODEL = 'openai/gpt-5.6-luna-pro';
+    mockedAxios.post.mockResolvedValue({
+      status: 200,
+      data: { choices: [{ finish_reason: 'stop', message: { content: '{"title":"A season"}' } }] },
+    } as any);
+    const service = new OpenRouterService(logger, prompts);
+
+    await expect(service.generateSeasonJson('system', 'user')).resolves.toEqual({ title: 'A season' });
+
+    expect(mockedAxios.post).toHaveBeenCalledWith(
+      'https://openrouter.ai/api/v1/chat/completions',
+      expect.objectContaining({ model: 'openai/gpt-5.6-luna-pro' }),
+      expect.any(Object),
+    );
+  });
+
   it('forwards an explicitly requested JSON Schema response format', async () => {
     mockedAxios.post.mockResolvedValue({
       status: 200,
@@ -208,6 +251,50 @@ describe('OpenRouterService season framework completions', () => {
         response_format: {
           type: 'json_schema',
           json_schema: schema,
+        },
+      }),
+      expect.any(Object),
+    );
+  });
+});
+
+describe('OpenRouterService episode generation routing', () => {
+  const mockedAxios = axios as jest.Mocked<typeof axios>;
+  const logger = {
+    warn: jest.fn(),
+    error: jest.fn(),
+    logOpenRouterError: jest.fn(),
+    logInvalidLlmResponse: jest.fn(),
+  } as any;
+  const prompts = { buildPrompt: jest.fn() } as any;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.OPEN_ROUTER_API_KEY = 'test-key';
+    process.env.OPENROUTER_STORY_MODEL = 'deepseek/deepseek-v4-flash-0731';
+    process.env.OPENROUTER_STORY_PROVIDER_ORDER = 'BaseTen,Makora';
+    process.env.OPENROUTER_STORY_PROVIDER_SORT = 'throughput';
+    process.env.OPENROUTER_STORY_PROVIDER_ALLOW_FALLBACKS = 'true';
+  });
+
+  it('uses BaseTen first and Makora as the only episode-generation fallback', async () => {
+    mockedAxios.post.mockResolvedValue({
+      status: 200,
+      data: { choices: [{ finish_reason: 'stop', message: { content: '{"title":"A chapter"}' } }] },
+    } as any);
+    const service = new OpenRouterService(logger, prompts);
+
+    await expect(service.generateJson('system', 'user')).resolves.toEqual({ title: 'A chapter' });
+
+    expect(mockedAxios.post).toHaveBeenCalledWith(
+      'https://openrouter.ai/api/v1/chat/completions',
+      expect.objectContaining({
+        model: 'deepseek/deepseek-v4-flash-0731',
+        provider: {
+          order: ['BaseTen', 'Makora'],
+          allow_fallbacks: true,
+          sort: 'throughput',
+          only: ['BaseTen', 'Makora'],
         },
       }),
       expect.any(Object),

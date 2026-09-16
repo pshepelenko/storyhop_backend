@@ -109,10 +109,10 @@ export class OpenRouterService {
     private readonly logger: FileLogger,
     private readonly prompts: PromptsService,
   ) {
-    const chatModel = process.env.OPENROUTER_STORY_MODEL || 'deepseek/deepseek-v4-flash-0731:nitro';
-    const seasonModel = process.env.OPENROUTER_SEASON_MODEL || 'deepseek/deepseek-v4-pro-0813';
+    const chatModel = process.env.OPENROUTER_STORY_MODEL || 'deepseek/deepseek-v4-flash-0731';
+    const seasonModel = process.env.OPENROUTER_SEASON_MODEL || 'openai/gpt-5.6-luna-pro';
     const storyProviderOrder = this.parseProviderOrder(
-      process.env.OPENROUTER_STORY_PROVIDER_ORDER,
+      process.env.OPENROUTER_STORY_PROVIDER_ORDER || 'BaseTen,Makora',
       chatModel,
       'flash',
     );
@@ -183,11 +183,14 @@ export class OpenRouterService {
   }
 
   private buildStoryProviderRouting(): Record<string, unknown> | undefined {
-    return this.buildProviderRouting(
+    const routing = this.buildProviderRouting(
       this.config.storyProviderOrder,
       this.config.storyProviderAllowFallbacks,
       this.config.storyProviderSort,
     );
+    return routing && this.config.storyProviderOrder.length
+      ? { ...routing, only: this.config.storyProviderOrder }
+      : routing;
   }
 
   private buildSeasonProviderRouting(): Record<string, unknown> | undefined {
@@ -513,45 +516,71 @@ export class OpenRouterService {
   }
 
   async generateImage(prompt: string): Promise<OpenRouterImageGenerationResult> {
-    try {
-      const response = await axios.post(
-        'https://openrouter.ai/api/v1/images',
-        {
-          model: this.config.imageModel,
-          prompt,
-          aspect_ratio: this.config.imageAspectRatio,
-          quality: this.config.imageQuality,
-          background: 'opaque',
-          n: 1,
-        },
-        { headers: this.authHeaders(), timeout: 180000 },
-      );
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const response = await axios.post(
+          'https://openrouter.ai/api/v1/images',
+          {
+            model: this.config.imageModel,
+            prompt,
+            aspect_ratio: this.config.imageAspectRatio,
+            quality: this.config.imageQuality,
+            background: 'opaque',
+            n: 1,
+          },
+          { headers: this.authHeaders(), timeout: 180000 },
+        );
 
-      const encoded = response.data?.data?.[0]?.b64_json;
-      if (typeof encoded !== 'string' || !encoded.trim()) {
-        throw new Error('OpenRouter image response did not include b64_json');
+        const encoded = response.data?.data?.[0]?.b64_json;
+        if (typeof encoded !== 'string' || !encoded.trim()) {
+          throw new Error('OpenRouter image response did not include b64_json');
+        }
+
+        const body = Buffer.from(encoded, 'base64');
+        if (!body.length) {
+          throw new Error('OpenRouter image response decoded to an empty buffer');
+        }
+
+        const contentType = String(
+          response.data?.data?.[0]?.media_type || response.data?.data?.[0]?.mime_type || 'image/png',
+        );
+        if (!contentType.startsWith('image/')) {
+          throw new Error(`OpenRouter image response returned unsupported content type: ${contentType}`);
+        }
+
+        const requestId = String(
+          response.headers?.['x-request-id'] || response.headers?.['request-id'] || '',
+        ).trim() || null;
+        return { body, contentType, requestId };
+      } catch (error) {
+        if (attempt === 1 && this.isImageSafetyRejection(error)) {
+          this.logger.warn(
+            `[OpenRouter] generateImage [${this.config.imageModel}] safety rejection; retrying once`,
+          );
+          continue;
+        }
+
+        this.logger.logOpenRouterError(`generateImage [${this.config.imageModel}]`, error);
+        throw error;
       }
-
-      const body = Buffer.from(encoded, 'base64');
-      if (!body.length) {
-        throw new Error('OpenRouter image response decoded to an empty buffer');
-      }
-
-      const contentType = String(
-        response.data?.data?.[0]?.media_type || response.data?.data?.[0]?.mime_type || 'image/png',
-      );
-      if (!contentType.startsWith('image/')) {
-        throw new Error(`OpenRouter image response returned unsupported content type: ${contentType}`);
-      }
-
-      const requestId = String(
-        response.headers?.['x-request-id'] || response.headers?.['request-id'] || '',
-      ).trim() || null;
-      return { body, contentType, requestId };
-    } catch (error) {
-      this.logger.logOpenRouterError(`generateImage [${this.config.imageModel}]`, error);
-      throw error;
     }
+
+    throw new Error('OpenRouter image generation exhausted its retry attempts');
+  }
+
+  private isImageSafetyRejection(error: unknown): boolean {
+    if (!axios.isAxiosError(error) && !(error && typeof error === 'object' && 'response' in error)) {
+      return false;
+    }
+
+    const response = (error as { response?: { status?: unknown; data?: unknown } }).response;
+    if (response?.status !== 400) {
+      return false;
+    }
+
+    const data = response.data as { error?: { message?: unknown }; message?: unknown } | undefined;
+    const message = data?.error?.message ?? data?.message;
+    return typeof message === 'string' && /rejected by the safety system/i.test(message);
   }
 
   async generateTts(text: string, voice?: string, speed?: number): Promise<Buffer> {

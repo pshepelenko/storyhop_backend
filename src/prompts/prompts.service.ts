@@ -24,7 +24,7 @@ export class PromptsService {
 
   private registerAll() {
     this.register('strategic-season-framework', {
-      version: 'framework-v3',
+      version: 'framework-v4',
       systemPrompt: () => `You are StoryHop's senior children's story architect.
 Create a season-level dramatic framework for an interactive English-learning story for children aged up to {{ageLimit}}.
 
@@ -32,13 +32,18 @@ Rules:
 - Return valid JSON only.
 - Do not include markdown.
 - Do not include hidden reasoning or explanations outside JSON.
-- The season must have one central complex problem that can sustain 20-30 short episodes.
+- The season must have one central complex problem that can sustain exactly 96 short episodes without a second unrelated quest after a false ending.
 - The problem must be serious and emotionally meaningful, but safe, age-appropriate, non-traumatic, non-medical, non-sexual, and non-political.
 - Use strong story structure: setup, inciting incident, point of no return, escalating mini-arcs, midpoint reversal, low point, final challenge, earned resolution.
-- Place the inciting incident in the equivalent of episodes 1-2, the point of no return by the end of the first mini-arc, the midpoint reversal near the middle, the low point in the final quarter, and the resolution in the final 1-3 episodes.
+- Use exactly eight mini-arcs: 1-12 setup, 13-24 escalation, 25-42 costly false solution or reversal, 43-60 discovery and deeper complication, 61-76 low-point recovery, 77-84 final approach without resolution, 85-94 decisive challenge, and 95-96 earned resolution only.
+- Place the inciting incident in episodes 1-2, the point of no return by episode 12, the midpoint reversal in episodes 41-48, the low point in episodes 65-76, and the resolution only in episodes 95-96. The central problem must remain materially unresolved through episode 84.
 - The heroes must get into a difficult situation and later get out of it through choices, friendship, courage, knowledge, English learning actions, and character growth.
 - Avoid random adventures. Every mini-arc must move the season toward resolving the central problem.
-- The season must have causal progression: later beats must grow out of earlier choices, discoveries, failures, and promises.`,
+- The season must have causal progression: later beats must grow out of earlier choices, discoveries, failures, and promises.
+- Give every mini-arc a concrete, child-visible local goal, obstacle, cost, and irreversible state change. Do not use a sequence of vague lessons, repeated moral speeches, or interchangeable "help each other" scenes.
+- Build meaningful trade-offs: a fast solution should cost safety, trust, time, resources, or another concrete story value; neither approach should be obviously good or bad.
+- Make abstract themes visible through actions, places, objects, relationships, and consequences. Do not rely on repeated words such as "promise", "pattern", "honest", or "together" as substitutes for a specific dramatic event.
+- Keep each JSON field information-dense and non-redundant. Do not restate the same premise, moral, or conflict in several fields.`,
       userPrompt: () => `Create a strategic season framework.
 
 Protagonist profile (the story's named hero; source of truth for identity and character):
@@ -131,7 +136,7 @@ Return JSON with this exact shape:
     });
 
     this.register('season-bible', {
-      version: 'bible-v2',
+      version: 'bible-v3',
       systemPrompt: () => `You are StoryHop's continuity designer.
 Create a practical season bible for a children's interactive English-learning story.
 
@@ -140,7 +145,9 @@ Rules:
 - Build strictly on the provided strategic season framework.
 - Preserve the central problem, dramatic question, stakes, and planned resolution.
 - Add reusable world, character, vocabulary, and continuity details for episode generation.
-- Keep the tone safe, warm, adventurous, and age-appropriate.`,
+- Keep the tone safe, warm, adventurous, and age-appropriate.
+- Store concrete facts that episode writers can show: stable character relationships, visible locations, repeatable rules, active promises, and irreversible consequences. Do not repeat the framework's moral in different wording.
+- Prefer simple, child-visible language over abstract social or philosophical labels.`,
       userPrompt: () => `Create a season bible.
 
 Strategic season framework:
@@ -195,7 +202,7 @@ Return JSON:
     });
 
     this.register('episode-outline', {
-      version: 'outline-v2',
+      version: 'outline-v3',
       systemPrompt: () => `You are StoryHop's season outline writer.
 Create a 90-100 episode outline for an interactive children's season.
 
@@ -205,7 +212,9 @@ Rules:
 - The outline must be long enough to entertain a child for a couple of hours without asking adults to repeat season setup.
 - The outline must escalate the central problem, preserve continuity, and lead to the planned resolution.
 - Include English-learning moments as meaningful story actions, not classroom drills.
-- Choices must have story consequences.`,
+- Choices must have story consequences.
+- Every outline item must leave one active local conflict unresolved for the end-of-episode A/B decision. Its cliffhangerOrHook must grow from that conflict, not introduce a random new sign, door, glow, object, or mystery after the scene has already resolved.
+- Before episode 85, do not restore the world, complete the hero's internal change, label a finale, or begin an unrelated follow-up quest.`,
       userPrompt: () => `Create an episode outline.
 
 Strategic season framework:
@@ -244,7 +253,7 @@ Return JSON:
     });
 
     this.register('episode-outline-batch', {
-      version: 'outline-batch-v1',
+      version: 'outline-batch-v2',
       systemPrompt: () => `You are StoryHop's season outline writer.
 Create a causally connected range of episode outline items for an interactive children's season.
 
@@ -254,7 +263,9 @@ Rules:
 - Generate only the requested episode number range. Do not repeat existing items.
 - Return exactly {{expectedEpisodeCount}} items: every episode number from {{fromEpisode}} through {{toEpisode}}, once each.
 - Every item must connect to the strategic season framework and one mini-arc.
-- Choices must have story consequences.`,
+- Choices must have story consequences.
+- Every item must end with one active unresolved local conflict that the A/B decision can address directly. Do not complete that action and then append an unrelated cliffhanger.
+- Preserve the framework's phase boundaries and do not resolve its central problem before episode 85.`,
       userPrompt: () => `Create episode outline items {{fromEpisode}} through {{toEpisode}} inclusive.
 
 Strategic season framework:
@@ -336,33 +347,8 @@ Return JSON:
 }`,
     });
 
-    this.register('hero-reference-image', {
-      version: 'hero-image-v2',
-      systemPrompt: () => '',
-      userPrompt: () => `Create a clean full-body character reference image for a recurring hero in a children's interactive story.
-
-Hero profile:
-{{heroProfileJson}}
-
-Hero visual brief:
-{{heroVisualBriefJson}}
-
-Style:
-- warm, polished children's book illustration
-- friendly, expressive, age-appropriate
-- full-body centered character
-- simple light background
-- clear silhouette
-- consistent outfit and signature accessory
-- keep visual details readable and repeatable in later generated episode illustrations
-- no text, no logo, no watermark, no UI
-- no scary, violent, sexualized, medical, political, or copyrighted elements
-
-The image must be suitable as a visual consistency reference for future story illustrations.`,
-    });
-
     this.register('episode-content', {
-      version: 'episode-v6',
+      version: 'episode-v8',
       systemPrompt: () => `You are StoryHop's interactive episode writer for children learning English.
 Write one short episode scene with choices.
 
@@ -378,6 +364,13 @@ Rules:
 - Each choice must be safe, meaningful, and lead to a different story state diff.
 - You MUST include exactly 2 choices with ids A and B. Never return only one choice or more than two.
 - Each choice must describe a clearly different action the child can take, not a rewording of the same action.
+- Treat each episode as one unfinished decision scene. The selected previous choice must be carried out and visible in this scene, but the current active scene conflict must remain unresolved in chapterText.
+- Treat the framework, current mini-arc, outline item, and actual story state as canonical. Turn their abstract theme into one concrete visible situation, action, relationship tension, or trade-off; do not repeat a lesson or moral instead of advancing the story.
+- Make the selected previous choice cause a visible consequence early in this chapter. Advance that consequence, then stop before the next decision point; never treat the prior choice as if it were still only an option.
+- End chapterText immediately BEFORE the decisive action or decision that addresses the current active conflict. The two choices are that decision point.
+- Both choices must directly address the SAME current unresolved conflict. They must be concrete, safe, genuinely different approaches and lead to different state consequences.
+- Do NOT narrate either proposed choice as already completed. Never show the hero crossing the bridge, opening the door, delivering the object, rescuing someone, solving the riddle, or otherwise completing the active decision before offering that action as a choice.
+- Do NOT resolve the local conflict and then introduce an unrelated sign, arrow, door, glow, object, or mystery solely to manufacture choices. A new discovery is allowed only when the outline or locked plan requires it and it causally belongs to the active conflict.
 - Do not resolve the whole season early unless this is the finale.
 - Do not include inappropriate, frightening, medical, sexual, political, or diagnostic content.
 - The first episode must directly use the framework's inciting incident to start the story. Do NOT use generic openings like fog, mysterious sleep, characters falling asleep, or waking up from a dream. The opening must be specific to the chosen world.
@@ -400,6 +393,7 @@ Rules:
 - Use each figure's correct age and type in the moment when it affects how they should look (for example an elder woman, a child, a small dragon). Do not describe a mentor as a young woman.
 - "illustrationCandidate.moment" must include setting, lighting, and key visible objects. Use only objects that appear in chapterText. Write 2-5 illustration-ready English sentences.
 - Every named figure in "illustrationCandidate.moment" must also appear in "sceneCharacters" with a matching name or alias and a complete "visualDescription" (age, body type, outfit/colors, expression, and any partial-view details such as silhouette or face only).
+- Before returning JSON, silently check: (1) name the one current unresolved scene task; (2) verify neither choice has already been performed; (3) verify the local conflict remains open at the end of chapterText; (4) verify both choices answer that same task and have different consequences; (5) verify there are exactly choices A and B; (6) remove any new object introduced only to create an artificial cliffhanger. Rewrite the ending if any check fails.
 {{lockedPlanRules}}`,
       userPrompt: () => `Generate episode content.
 
@@ -517,7 +511,7 @@ Return JSON:
     });
 
     this.register('prepared-next', {
-      version: 'prepared-next-v3',
+      version: 'prepared-next-v5',
       systemPrompt: () => `You are StoryHop's background branch planner.
 Prepare likely next-episode candidates while the child is reading the current episode.
 
@@ -527,7 +521,13 @@ Rules:
 - Prepare branch plans that can be quickly expanded after the child chooses.
 - Each candidate must preserve continuity and the strategic season framework.
 - Candidates for different choices must lead to meaningfully different scenes and state previews.
-- Each plan must fit the next episode outline item and current mini-arc.`,
+- Each plan must fit the next episode outline item and current mini-arc.
+- Translate the framework and outline into concrete child-visible action, relationship tension, or trade-off. Do not use a repeated moral or vocabulary lesson as the scene conflict.
+- Design one unresolved decision point for the END of each prepared episode scene. Its endingHook must stop immediately before that decision is performed, not after a local resolution followed by an unrelated new event.
+- Both choiceSketches must directly answer that same active unresolved conflict with meaningfully different approaches and consequences.
+- Do not describe the result of either choice as already completed in endingHook, branchSummary, or choiceSketches. The next generated episode must be able to begin naturally by carrying out the selected choice.
+- Do not add a random sign, arrow, door, glow, object, or mystery solely to make a cliffhanger. A discovery is allowed only when it is required by the outline or follows causally from the active conflict.
+- Before returning JSON, silently check that each candidate has one open decision point, exactly choice sketches A and B, no completed proposed choice, and no artificial unrelated hook. Rewrite the plan if any check fails.`,
       userPrompt: () => `Prepare next episode candidates.
 
 Current episode:
@@ -648,10 +648,6 @@ Hero profile:
 
 Hero visual brief:
 {{heroVisualBriefJson}}
-
-Hero reference image:
-Use the existing hero reference image as the consistency anchor:
-{{heroReferenceImageUrlOrDescription}}
 
 Scene requirements:
 - show the hero clearly and consistently
